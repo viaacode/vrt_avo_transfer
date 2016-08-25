@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:context="http://www.springframework.org/schema/context" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="${http.port}" doc:name="HTTP Listener Configuration"/>
+    <context:property-placeholder location="${mule.env}.properties"/>
+    <db:generic-config name="PostgreSQL_CONNECTION" url="jdbc:postgresql://${db.host}:${db.port}/${db.database}?password=${db.password}&amp;user=${db.username}" driverClassName="org.postgresql.Driver" doc:name="Generic Database Configuration"> 
+        <reconnect></reconnect>  
+    </db:generic-config>
+    <flow name="vrt_avo_transferFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/briefings/*" allowedMethods="GET, POST, DELETE" doc:name="HTTP"/>
+        <choice doc:name="Check which HTTP method is used">
+            <when expression="#[message.inboundProperties.'http.method' == 'POST']">
+                <logger level="INFO" doc:name="POST"/>
+                <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
+                <set-variable variableName="briefing_id" value="#[payload['briefing_id']]" doc:name="Set briefing_id"/>
+                <logger level="INFO" doc:name="TODO: retrieve briefing_title from skryv API"/>
+                <set-variable variableName="media_ids" value="#[payload['media_ids']]" doc:name="Set media_ids"/>
+                <set-variable variableName="email" value="#[payload['email']]" doc:name="Set email"/>
+                <set-variable variableName="reception_date" value="#[Calendar.getInstance().time]" doc:name="Set reception_date"/>
+                <set-variable variableName="bulkInsert" value="#[[]]" doc:name="Set bulkInsert"/>
+                <foreach collection="#[flowVars.media_ids]" doc:name="For Each media id">
+                    <expression-component doc:name="Add new entry to bulkInsert"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload, 'QUEUED', flowVars.email, flowVars.reception_date])]]]></expression-component>
+                </foreach>
+                <set-payload value="#[flowVars.bulkInsert]" doc:name="Set Payload with bulkInsert"/>
+                <db:insert config-ref="PostgreSQL_CONNECTION" bulkMode="true" doc:name="Bulk insert into vrt_avo_transfer">
+                    <db:parameterized-query><![CDATA[INSERT INTO ${db.avo_transfer} (
+	briefing_id,
+	media_id,
+	status,
+	email,
+	reception_date
+)
+VALUES(
+	#[payload[0]],
+	#[payload[1]],
+	#[payload[2]],
+	#[payload[3]],
+	#[payload[4]]
+	)]]></db:parameterized-query>
+                </db:insert>
+                <logger message="Briefing_id #[flowVars.briefing_id] has been added with media_ids: #[flowVars.media_ids] (contact person: #[flowVars.email])" level="INFO" doc:name="Add media_id with briefing_id"/>
+            </when>
+            <otherwise>
+                <logger message="GET" level="INFO" doc:name="GET"/>
+                <set-variable variableName="briefing_id" value="#[message.inboundProperties.'http.request.uri'.substring(message.inboundProperties.'http.request.uri'.lastIndexOf('/')+1)]" doc:name="Set briefing_id"/>
+                <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Get briefing">
+                    <db:parameterized-query><![CDATA[select *
+from ${db.avo_transfer}
+where briefing_id = #[flowVars.briefing_id]]]></db:parameterized-query>
+                </db:select>
+                <json:object-to-json-transformer doc:name="Object to JSON"/>
+                <logger level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+    </flow>
+</mule>
