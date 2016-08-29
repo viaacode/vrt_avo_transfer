@@ -2,4 +2,6 @@
 <mule-project xmlns="http://www.mulesoft.com/tooling/project" runtimeId="org.mule.tooling.server.3.8.0.ee" schemaVersion="5.3.0.0">
     <name>vrt_avo_transfer</name>
     <description></description>
+    <muleExtension name="AMQPS-0-9" qualifier="mule-transport-amqp-contribution"/>
+    <muleExtension name="AMQP-0-9" qualifier="mule-transport-amqp-contribution"/>
 </mule-project>
