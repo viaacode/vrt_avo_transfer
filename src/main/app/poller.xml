@@ -81,8 +81,13 @@ where id = #[flowVars.id]]]></db:parameterized-query>
 {
 	MediaHAVEN_external_metadata: {
 		MDProperties: {
-			Algemeen_Briefing_titel: flowVars.briefing_title,
-			Algemeen_Briefing_ID: flowVars.briefing_id
+			// dit is doorzoekbaar
+			Algemeen_Briefing_ID @(type:"list"): {
+				BriefingID: flowVars.briefing_id			
+			},
+			Algemeen_Briefing_ID_titel @(type:"list"): {
+				(flowVars.briefing_id): flowVars.briefing_title
+			}
 		}
 	}
 }]]></dw:set-payload>
