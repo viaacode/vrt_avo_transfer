@@ -24,14 +24,14 @@ http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee
                 <logger level="INFO" doc:name="POST"/>
                 <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
                 <set-variable variableName="briefing_id" value="#[message.inboundProperties.'http.request.uri'.substring(message.inboundProperties.'http.request.uri'.lastIndexOf('/')+1)]" doc:name="Set briefing_id (prefer to take from URI)"/>
-                <logger level="INFO" doc:name="TODO: retrieve briefing_title from skryv API"/>
+                <logger level="INFO" doc:name="TODO: retrieve briefing_title from skryv API | Controle!"/>
                 <set-variable variableName="media_ids" value="#[payload['media_ids']]" doc:name="Set media_ids"/>
                 <set-variable variableName="email" value="#[payload['email']]" doc:name="Set email"/>
                 <set-variable variableName="media_type" value="#[payload['media_type'].toLowerCase()]" doc:name="Set media_type in lower case"/>
                 <set-variable variableName="reception_date" value="#[Calendar.getInstance().time]" doc:name="Set reception_date"/>
                 <set-variable variableName="bulkInsert" value="#[[]]" doc:name="Set bulkInsert"/>
                 <foreach collection="#[flowVars.media_ids]" doc:name="For Each media id">
-                    <expression-component doc:name="Add new entry to bulkInsert"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload, 'QUEUED', flowVars.email, flowVars.reception_date])]]]></expression-component>
+                    <expression-component doc:name="Add new entry to bulkInsert with status QUEUED"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload, 'QUEUED', flowVars.email, flowVars.reception_date])]]]></expression-component>
                 </foreach>
                 <set-payload value="#[flowVars.bulkInsert]" doc:name="Set Payload with bulkInsert"/>
                 <db:insert config-ref="PostgreSQL_CONNECTION" bulkMode="true" doc:name="Bulk insert into vrt_avo_transfer">
@@ -55,14 +55,68 @@ VALUES(
             <otherwise>
                 <logger message="GET" level="INFO" doc:name="GET"/>
                 <set-variable variableName="briefing_id" value="#[message.inboundProperties.'http.request.uri'.substring(message.inboundProperties.'http.request.uri'.lastIndexOf('/')+1)]" doc:name="Set briefing_id"/>
-                <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Get briefing">
-                    <db:parameterized-query><![CDATA[select *
+                <choice doc:name="Briefing ID given?">
+                	<when expression="#[flowVars.briefing_id.equals('briefings')||flowVars.briefing_id.equals('')]">
+                		<db:select config-ref="PostgreSQL_CONNECTION" doc:name="Get all briefings">
+                            <db:parameterized-query><![CDATA[select *
+from ${db.avo_transfer}]]></db:parameterized-query>
+                        </db:select>
+                        <dw:transform-message doc:name="Transform Message">
+                            <dw:input-payload doc:sample="sample_data/list_map.dwl"/>
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var groupedBriefings = (payload as :array) groupBy $.briefing_id
+%var distinctBriefingIds = (payload.briefing_id as :array) distinctBy $
+---
+{
+	"briefings": distinctBriefingIds map (
+		{
+			briefing_id: groupedBriefings[$][0].briefing_id,
+			briefing_title: groupedBriefings[$][0].briefing_title,
+			reception_date: groupedBriefings[$][0].reception_date,
+			email: groupedBriefings[$][0].email,
+			media_ids: groupedBriefings[$] map (
+				{
+					media_id: $.media_id,
+					media_type: $.media_type,
+					status: $.status	
+				}
+			)	
+		}
+	)
+}]]></dw:set-payload>
+                        </dw:transform-message>
+                        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+                	</when>
+                    <otherwise>
+                        <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Get briefing">
+                            <db:parameterized-query><![CDATA[select *
 from ${db.avo_transfer}
 where briefing_id = #[flowVars.briefing_id]]]></db:parameterized-query>
-                </db:select>
+                        </db:select>
+                        <dw:transform-message doc:name="Transform Message">
+                            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var groupedBriefings = (payload as :array) groupBy flowVars.briefing_id
+---
+{
+	briefing_id: groupedBriefings[flowVars.briefing_id][0].briefing_id,
+	briefing_title: groupedBriefings[flowVars.briefing_id][0].briefing_title,
+	reception_date: groupedBriefings[flowVars.briefing_id][0].reception_date,
+	email: groupedBriefings[flowVars.briefing_id][0].email,
+	media_ids: groupedBriefings[flowVars.briefing_id] map (
+		{
+			media_id: $.media_id,
+			media_type: $.media_type,
+			status: $.status	
+		}
+	)	
+}]]></dw:set-payload>
+                        </dw:transform-message>
+                        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+                    </otherwise>
+                </choice>
                 <json:object-to-json-transformer doc:name="Object to JSON"/>
-                <logger level="INFO" doc:name="Logger"/>
-                <logger level="INFO" doc:name="TODO : return list of briefing ids"/>
             </otherwise>
         </choice>
     </flow>
