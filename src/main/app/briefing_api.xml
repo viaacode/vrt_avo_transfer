@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:context="http://www.springframework.org/schema/context" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+<mule xmlns:quartz="http://www.mulesoft.org/schema/mule/quartz" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:context="http://www.springframework.org/schema/context" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
 	xmlns:spring="http://www.springframework.org/schema/beans" 
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
@@ -11,55 +11,75 @@ http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/jso
 http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
 http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
 http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
-http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/quartz http://www.mulesoft.org/schema/mule/quartz/current/mule-quartz.xsd">
     <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="${http.port}" doc:name="HTTP Listener Configuration"/>
     <context:property-placeholder location="${mule.env}.properties"/>
     <db:generic-config name="PostgreSQL_CONNECTION" url="jdbc:postgresql://${db.host}:${db.port}/${db.database}?password=${db.password}&amp;user=${db.username}" driverClassName="org.postgresql.Driver" doc:name="Generic Database Configuration"> 
         <reconnect></reconnect>  
     </db:generic-config>
+    <quartz:connector name="Quartz1" validateConnections="true" doc:name="Quartz"/>
+    <http:request-config name="HTTP_Skryv_OAUTH" host="${skryv.oauth_host}" port="443" responseTimeout="30000" doc:name="HTTP Request Configuration" protocol="HTTPS"/>
+    <http:request-config name="Skryv_API" protocol="HTTPS" host="${skryv.api_host}" port="443" doc:name="HTTP Request Configuration" responseTimeout="30000"/>
     <flow name="vrt_avo_transferFlow">
-        <http:listener config-ref="HTTP_Listener_Configuration" path="/briefings/*" allowedMethods="GET, POST, DELETE" doc:name="HTTP"/>
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/briefings/*" allowedMethods="GET, POST, DELETE" doc:name="/briefings/*"/>
         <choice doc:name="Check which HTTP method is used">
             <when expression="#[message.inboundProperties.'http.method' == 'POST']">
                 <logger level="INFO" doc:name="POST"/>
+                <logger level="INFO" doc:name="Note: the POST briefing button is only possible when briefing_id has been validated by skryv"/>
                 <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
                 <set-variable variableName="briefing_id" value="#[message.inboundProperties.'http.request.uri'.substring(message.inboundProperties.'http.request.uri'.lastIndexOf('/')+1)]" doc:name="Set briefing_id (prefer to take from URI)"/>
-                <logger level="INFO" doc:name="TODO: retrieve briefing_title from skryv API | Controle!"/>
+                <set-variable variableName="briefing_titel" value="#[payload['briefing_titel']]" doc:name="Set briefing_titel"/>
                 <set-variable variableName="media_ids" value="#[payload['media_ids']]" doc:name="Set media_ids"/>
-                <set-variable variableName="email" value="#[payload['email']]" doc:name="Set email"/>
-                <set-variable variableName="media_type" value="#[payload['media_type'].toLowerCase()]" doc:name="Set media_type in lower case"/>
+                <set-variable variableName="uitvoerder" value="#[payload['uitvoerder']]" doc:name="Set uitvoerder"/>
+                <set-variable variableName="toegevoegd_door" value="#[payload['toegevoegd_door']]" doc:name="Set toegevoegd_door"/>
                 <set-variable variableName="reception_date" value="#[Calendar.getInstance().time]" doc:name="Set reception_date"/>
                 <set-variable variableName="bulkInsert" value="#[[]]" doc:name="Set bulkInsert"/>
+                <logger level="INFO" doc:name="TODO: delete previous version of the briefing when available"/>
                 <foreach collection="#[flowVars.media_ids]" doc:name="For Each media id">
-                    <expression-component doc:name="Add new entry to bulkInsert with status QUEUED"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload, 'QUEUED', flowVars.email, flowVars.reception_date])]]]></expression-component>
+                    <expression-component doc:name="Add new entry to bulkInsert with status QUEUED"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload, 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel])]]]></expression-component>
                 </foreach>
                 <set-payload value="#[flowVars.bulkInsert]" doc:name="Set Payload with bulkInsert"/>
-                <db:insert config-ref="PostgreSQL_CONNECTION" bulkMode="true" doc:name="Bulk insert into vrt_avo_transfer">
+                <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Set status of previous briefing version DELETED">
+                    <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
+SET status = 'DELETED'
+where briefing_id = #[flowVars.briefing_id]]]></db:parameterized-query>
+                </db:update>
+                <db:insert config-ref="PostgreSQL_CONNECTION" bulkMode="true" doc:name="Bulk insert new briefing into vrt_avo_transfer">
                     <db:parameterized-query><![CDATA[INSERT INTO ${db.avo_transfer} (
 	briefing_id,
 	media_id,
 	status,
-	email,
-	reception_date
+	uitvoerder,
+	toegevoegd_door,
+	reception_date,
+	briefing_titel
 )
 VALUES(
 	#[payload[0]],
 	#[payload[1]],
 	#[payload[2]],
 	#[payload[3]],
-	#[payload[4]]
+	#[payload[4]],
+	#[payload[5]],
+	#[payload[6]],
+	#[payload[7]]
 	)]]></db:parameterized-query>
                 </db:insert>
                 <logger message="Briefing_id #[flowVars.briefing_id] has been added with media_ids: #[flowVars.media_ids] (contact person: #[flowVars.email])" level="INFO" doc:name="Add media_id with briefing_id"/>
+                <set-variable variableName="status" value="#['QUEUED']" doc:name="Set status (QUEUED)"/>
+                <flow-ref name="log_elastic_search" doc:name="log_elastic_search"/>
             </when>
             <otherwise>
                 <logger message="GET" level="INFO" doc:name="GET"/>
+                <logger level="INFO" doc:name="TODO: filter out the briefings that are completed"/>
                 <set-variable variableName="briefing_id" value="#[message.inboundProperties.'http.request.uri'.substring(message.inboundProperties.'http.request.uri'.lastIndexOf('/')+1)]" doc:name="Set briefing_id"/>
                 <choice doc:name="Briefing ID given?">
                 	<when expression="#[flowVars.briefing_id.equals('briefings')||flowVars.briefing_id.equals('')]">
-                		<db:select config-ref="PostgreSQL_CONNECTION" doc:name="Get all briefings">
+                		<db:select config-ref="PostgreSQL_CONNECTION" doc:name="Get all briefings that are not DELETED">
                             <db:parameterized-query><![CDATA[select *
-from ${db.avo_transfer}]]></db:parameterized-query>
+from ${db.avo_transfer}
+where status != 'DELETED']]></db:parameterized-query>
                         </db:select>
                         <dw:transform-message doc:name="Transform Message">
                             <dw:input-payload doc:sample="sample_data/list_map.dwl"/>
@@ -67,14 +87,20 @@ from ${db.avo_transfer}]]></db:parameterized-query>
 %output application/json
 %var groupedBriefings = (payload as :array) groupBy $.briefing_id
 %var distinctBriefingIds = (payload.briefing_id as :array) distinctBy $
+%var groupedStatussen = (payload as :array) groupBy $.status
 ---
 {
 	"briefings": distinctBriefingIds map (
 		{
 			briefing_id: groupedBriefings[$][0].briefing_id,
-			briefing_title: groupedBriefings[$][0].briefing_title,
+			briefing_titel: groupedBriefings[$][0].briefing_titel,
 			reception_date: groupedBriefings[$][0].reception_date,
-			email: groupedBriefings[$][0].email,
+			uitvoerder: groupedBriefings[$][0].uitvoerder,
+			toegevoegd_door: groupedBriefings[$][0].toegevoegd_door,
+			aantal_bezig: (sizeOf groupedBriefings - sizeOf groupedStatussen['COMPLETED'])
+				when groupedStatussen['COMPLETED'] != null
+				otherwise (sizeOf groupedBriefings),
+			totaal: sizeOf groupedBriefings,
 			media_ids: groupedBriefings[$] map (
 				{
 					media_id: $.media_id,
@@ -92,18 +118,22 @@ from ${db.avo_transfer}]]></db:parameterized-query>
                         <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Get briefing">
                             <db:parameterized-query><![CDATA[select *
 from ${db.avo_transfer}
-where briefing_id = #[flowVars.briefing_id]]]></db:parameterized-query>
+where briefing_id = #[flowVars.briefing_id] and status != 'DELETED']]></db:parameterized-query>
                         </db:select>
                         <dw:transform-message doc:name="Transform Message">
                             <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
 %var groupedBriefings = (payload as :array) groupBy flowVars.briefing_id
+%var groupedStatussen = (payload as :array) groupBy $.status
 ---
 {
 	briefing_id: groupedBriefings[flowVars.briefing_id][0].briefing_id,
-	briefing_title: groupedBriefings[flowVars.briefing_id][0].briefing_title,
+	briefing_titel: groupedBriefings[flowVars.briefing_id][0].briefing_titel,
 	reception_date: groupedBriefings[flowVars.briefing_id][0].reception_date,
-	email: groupedBriefings[flowVars.briefing_id][0].email,
+	uitvoerder: groupedBriefings[flowVars.briefing_id][0].uitvoerder,
+	toegevoegd_door: groupedBriefings[flowVars.briefing_id][0].toegevoegd_door,
+	aantal_bezig: sizeOf groupedBriefings - sizeOf groupedStatussen['COMPLETED'],
+	totaal: sizeOf groupedBriefings,
 	media_ids: groupedBriefings[flowVars.briefing_id] map (
 		{
 			media_id: $.media_id,
@@ -119,5 +149,82 @@ where briefing_id = #[flowVars.briefing_id]]]></db:parameterized-query>
                 <json:object-to-json-transformer doc:name="Object to JSON"/>
             </otherwise>
         </choice>
+    </flow>
+    <flow name="validateBriefingIDAndReturnMediaIds" initialState="started">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/briefings/validate" allowedMethods="POST" doc:name="/briefings/validate"/>
+        <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
+        <set-variable variableName="briefing_id" value="#[payload['briefing_id']]" doc:name="Set briefing_id to validate"/>
+        <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Retrieve access_token">
+            <db:parameterized-query><![CDATA[select *
+from ${db.skryv_token}
+where id = 1]]></db:parameterized-query>
+        </db:select>
+        <set-variable variableName="access_token" value="#[payload[0].access_token]" doc:name="Set access_token"/>
+        <http:request config-ref="Skryv_API" path="/api/documents/#[flowVars.briefing_id]" method="GET" doc:name="Get briefing_ID from Skryv API" parseResponse="false">
+            <http:request-builder>
+                <http:header headerName="Authorization" value="Bearer #[flowVars.access_token]"/>
+                <http:header headerName="Accept" value="application/json"/>
+            </http:request-builder>
+        </http:request>
+        <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
+        <dw:transform-message doc:name="Fetch media_ids, email and briefing_titel">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"briefing_id": flowVars.briefing_id,
+	"briefing_titel": payload.document['value'].briefing_titel,
+	"datum": payload.document['value'].finale_selectie_gemaakt_1.datum_6,
+	"uitvoerder": payload.document['value'].finale_selectie_gemaakt_1.uitvoerder_4,
+	"media_ids": (payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_video splitBy "\n" map (
+		{
+			"media_id": trim $,
+			"media_type": "video"
+		}
+		)) 
+		++ (payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_audio splitBy "\n" map (
+		{
+			"media_id": trim $,
+			"media_type": "audio"
+		}
+		))
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="500: BRIEFING NOT FOUND #[flowVars.briefing_id]" level="INFO" doc:name="500: BRIEFING NOT FOUND"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"error": "briefing not found",
+	"code": "500"
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <set-property propertyName="http.status" value="#[message.inboundProperties['http.status']]" doc:name="Set http status 500"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="FetchNewAccessTokenWithRefreshToken" >
+        <quartz:inbound-endpoint jobName="PollerJob" repeatInterval="300000" responseTimeout="10000" doc:name="Quartz" connector-ref="Quartz1" startDelay="0">
+            <quartz:event-generator-job/>
+        </quartz:inbound-endpoint>
+        <logger message="Requesting new access token" level="INFO" doc:name="Requesting new access token"/>
+        <http:request config-ref="HTTP_Skryv_OAUTH" path="/oauth/token" method="POST" doc:name="Send POST to Skryv">
+            <http:request-builder>
+                <http:query-param paramName="client_id" value="${skryv.client_id}"/>
+                <http:query-param paramName="client_secret" value="${skryv.client_secret}"/>
+                <http:query-param paramName="grant_type" value="password"/>
+                <http:query-param paramName="username" value="${skryv.username}"/>
+                <http:query-param paramName="password" value="${skryv.password}"/>
+            </http:request-builder>
+        </http:request>
+        <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
+        <set-variable variableName="access_token" value="#[payload['refresh_token']]" doc:name="Set access_token"/>
+        <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Save access_token">
+            <db:parameterized-query><![CDATA[UPDATE ${db.skryv_token}
+SET access_token = #[flowVars.access_token]
+where id = 1]]></db:parameterized-query>
+        </db:update>
     </flow>
 </mule>
