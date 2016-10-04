@@ -26,7 +26,6 @@ http://www.mulesoft.org/schema/mule/quartz http://www.mulesoft.org/schema/mule/q
         <choice doc:name="Check which HTTP method is used">
             <when expression="#[message.inboundProperties.'http.method' == 'POST']">
                 <logger level="INFO" doc:name="POST"/>
-                <logger level="INFO" doc:name="Note: the POST briefing button is only possible when briefing_id has been validated by skryv"/>
                 <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
                 <set-variable variableName="briefing_id" value="#[message.inboundProperties.'http.request.uri'.substring(message.inboundProperties.'http.request.uri'.lastIndexOf('/')+1)]" doc:name="Set briefing_id (prefer to take from URI)"/>
                 <set-variable variableName="briefing_titel" value="#[payload['briefing_titel']]" doc:name="Set briefing_titel"/>
@@ -35,20 +34,26 @@ http://www.mulesoft.org/schema/mule/quartz http://www.mulesoft.org/schema/mule/q
                 <set-variable variableName="toegevoegd_door" value="#[payload['toegevoegd_door']]" doc:name="Set toegevoegd_door"/>
                 <set-variable variableName="reception_date" value="#[Calendar.getInstance().time]" doc:name="Set reception_date"/>
                 <set-variable variableName="bulkInsert" value="#[[]]" doc:name="Set bulkInsert"/>
-                <logger level="INFO" doc:name="TODO: delete previous version of the briefing when available"/>
-                <foreach collection="#[flowVars.media_ids]" doc:name="For Each media id">
-                    <expression-component doc:name="Add new entry to bulkInsert with status QUEUED"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload, 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel])]]]></expression-component>
-                </foreach>
-                <set-payload value="#[flowVars.bulkInsert]" doc:name="Set Payload with bulkInsert"/>
                 <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Set status of previous briefing version DELETED">
                     <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'DELETED'
 where briefing_id = #[flowVars.briefing_id]]]></db:parameterized-query>
                 </db:update>
+                <foreach collection="#[flowVars.media_ids]" doc:name="For Each media id">
+                    <expression-component doc:name="Add new entry to bulkInsert with status QUEUED"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload.media_id, payload.media_type, 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel])]]]></expression-component>
+                    <set-variable variableName="media_type" value="#[payload.media_type]" doc:name="Set media_type"/>
+                    <set-variable variableName="media_id" value="#[payload.media_id]" doc:name="Set media_id"/>
+                    <set-variable variableName="status" value="#['QUEUED']" doc:name="Set status (QUEUED)"/>
+                    <async doc:name="Async">
+                        <flow-ref name="log_elastic_search" doc:name="log_elastic_search"/>
+                    </async>
+                </foreach>
+                <set-payload value="#[flowVars.bulkInsert]" doc:name="Set Payload with bulkInsert"/>
                 <db:insert config-ref="PostgreSQL_CONNECTION" bulkMode="true" doc:name="Bulk insert new briefing into vrt_avo_transfer">
                     <db:parameterized-query><![CDATA[INSERT INTO ${db.avo_transfer} (
 	briefing_id,
 	media_id,
+	media_type,
 	status,
 	uitvoerder,
 	toegevoegd_door,
@@ -62,13 +67,19 @@ VALUES(
 	#[payload[3]],
 	#[payload[4]],
 	#[payload[5]],
-	#[payload[6]],
+	now(),
 	#[payload[7]]
 	)]]></db:parameterized-query>
                 </db:insert>
                 <logger message="Briefing_id #[flowVars.briefing_id] has been added with media_ids: #[flowVars.media_ids] (contact person: #[flowVars.email])" level="INFO" doc:name="Add media_id with briefing_id"/>
-                <set-variable variableName="status" value="#['QUEUED']" doc:name="Set status (QUEUED)"/>
-                <flow-ref name="log_elastic_search" doc:name="log_elastic_search"/>
+                <dw:transform-message doc:name="Build response JSON">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"message": "Succesvol toegevoegd!"
+}]]></dw:set-payload>
+                </dw:transform-message>
             </when>
             <otherwise>
                 <logger message="GET" level="INFO" doc:name="GET"/>
@@ -149,6 +160,19 @@ where briefing_id = #[flowVars.briefing_id] and status != 'DELETED']]></db:param
                 <json:object-to-json-transformer doc:name="Object to JSON"/>
             </otherwise>
         </choice>
+        <catch-exception-strategy doc:name="Copy_of_Catch Exception Strategy">
+            <logger message="500: BRIEFING NOT ADDED #[flowVars.briefing_id]" level="INFO" doc:name="500: BRIEFING NOT ADDED"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"error": "briefing not found",
+	"code": "500"
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <set-property propertyName="http.status" value="#[message.inboundProperties['http.status']]" doc:name="Set http status 500"/>
+        </catch-exception-strategy>
     </flow>
     <flow name="validateBriefingIDAndReturnMediaIds" initialState="started">
         <http:listener config-ref="HTTP_Listener_Configuration" path="/briefings/validate" allowedMethods="POST" doc:name="/briefings/validate"/>
@@ -176,13 +200,13 @@ where id = 1]]></db:parameterized-query>
 	"briefing_titel": payload.document['value'].briefing_titel,
 	"datum": payload.document['value'].finale_selectie_gemaakt_1.datum_6,
 	"uitvoerder": payload.document['value'].finale_selectie_gemaakt_1.uitvoerder_4,
-	"media_ids": (payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_video splitBy "\n" map (
+	"media_ids": (payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_video splitBy "\n" filter trim $ != "" map (
 		{
 			"media_id": trim $,
 			"media_type": "video"
 		}
-		)) 
-		++ (payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_audio splitBy "\n" map (
+		))
+		++ (payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_audio splitBy "\n" filter trim $ != "" map (
 		{
 			"media_id": trim $,
 			"media_type": "audio"
