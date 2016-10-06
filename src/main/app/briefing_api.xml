@@ -110,6 +110,8 @@ where status != 'DELETED']]></db:parameterized-query>
 			toegevoegd_door: groupedBriefings[$][0].toegevoegd_door,
 			aantal_bezig: (sizeOf groupedBriefings[$]) - (sizeOf (getGroupedStatussen($)['RECONCILED'] as :array)),
 			totaal: sizeOf groupedBriefings[$],
+			klaar: false when ((sizeOf groupedBriefings[$]) - (sizeOf groupedBriefings[$]) - (sizeOf (getGroupedStatussen($)['RECONCILED'] as :array))) > 0
+				otherwise true,
 			media_ids: groupedBriefings[$] map (
 				{
 					media_id: $.media_id,
@@ -143,6 +145,8 @@ where briefing_id = #[flowVars.briefing_id] and status != 'DELETED']]></db:param
 	toegevoegd_door: groupedBriefings[flowVars.briefing_id][0].toegevoegd_door,
 	aantal_bezig: (sizeOf groupedBriefings[0]) - (sizeOf groupedStatussen['RECONCILED']),
 	totaal: sizeOf groupedBriefings[0],
+	klaar: false when ((sizeOf groupedBriefings[0]) - (sizeOf groupedBriefings[0]) - (sizeOf groupedStatussen['RECONCILED'])) > 0
+		otherwise true,
 	media_ids: groupedBriefings[flowVars.briefing_id] map (
 		{
 			media_id: $.media_id,
