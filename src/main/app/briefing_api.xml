@@ -98,7 +98,7 @@ where status != 'DELETED']]></db:parameterized-query>
 %output application/json
 %var groupedBriefings = (payload as :array) groupBy $.briefing_id
 %var distinctBriefingIds = (payload.briefing_id as :array) distinctBy $
-%var groupedStatussen = (payload as :array) groupBy $.status
+%function getGroupedStatussen(briefingId) (groupedBriefings[briefingId]) groupBy $.status
 ---
 {
 	"briefings": distinctBriefingIds map (
@@ -108,10 +108,8 @@ where status != 'DELETED']]></db:parameterized-query>
 			reception_date: groupedBriefings[$][0].reception_date,
 			uitvoerder: groupedBriefings[$][0].uitvoerder,
 			toegevoegd_door: groupedBriefings[$][0].toegevoegd_door,
-			aantal_bezig: (sizeOf groupedBriefings - sizeOf groupedStatussen['COMPLETED'])
-				when groupedStatussen['COMPLETED'] != null
-				otherwise (sizeOf groupedBriefings),
-			totaal: sizeOf groupedBriefings,
+			aantal_bezig: (sizeOf groupedBriefings[$]) - (sizeOf (getGroupedStatussen($)['RECONCILED'] as :array)),
+			totaal: sizeOf groupedBriefings[$],
 			media_ids: groupedBriefings[$] map (
 				{
 					media_id: $.media_id,
@@ -143,8 +141,8 @@ where briefing_id = #[flowVars.briefing_id] and status != 'DELETED']]></db:param
 	reception_date: groupedBriefings[flowVars.briefing_id][0].reception_date,
 	uitvoerder: groupedBriefings[flowVars.briefing_id][0].uitvoerder,
 	toegevoegd_door: groupedBriefings[flowVars.briefing_id][0].toegevoegd_door,
-	aantal_bezig: sizeOf groupedBriefings - sizeOf groupedStatussen['COMPLETED'],
-	totaal: sizeOf groupedBriefings,
+	aantal_bezig: (sizeOf groupedBriefings[0]) - (sizeOf groupedStatussen['RECONCILED']),
+	totaal: sizeOf groupedBriefings[0],
 	media_ids: groupedBriefings[flowVars.briefing_id] map (
 		{
 			media_id: $.media_id,
