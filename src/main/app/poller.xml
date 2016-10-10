@@ -15,6 +15,9 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
         <reconnect-forever></reconnect-forever>  
     </amqp:connector>
     <http:request-config name="HTTP_ES_logging" host="${elasticsearch.host}" port="9200" basePath="/" responseTimeout="30000" doc:name="HTTP Request Configuration"/>
+    <http:request-config name="HTTP_Request_Configuration" protocol="HTTPS" host="hooks.slack.com" port="443" basePath="/services" doc:name="HTTP Request Configuration">
+        <http:proxy host="${proxy.host}" port="80"/>
+    </http:request-config>
     <ftp:connector name="FTP" pollingFrequency="1000" validateConnections="true" doc:name="FTP"/>
     <flow name="pollerFlow">
         <amqp:inbound-endpoint queueName="vrt_avo_poller" numberOfChannels="1" responseTimeout="10000" exchange-pattern="request-response"  doc:name="Receive token from vrt_avo_poller" connector-ref="amqp"/>
@@ -124,6 +127,29 @@ SET status = 'RECONCILED', pid = #[flowVars.pid]
 where id = #[flowVars.id]]]></db:parameterized-query>
                             </db:update>
                             <set-variable variableName="status" value="#['RECONCILED']" doc:name="Set status (RECONCILED)"/>
+                        <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Check if briefing is READY">
+                            <db:parameterized-query><![CDATA[select count(1) totaal, SUM(CASE WHEN status = 'RECONCILED' THEN 1 ELSE 0 END) aantal_klaar
+FROM ${db.avo_transfer}
+where briefing_id = #[flowVars.briefing_id] AND status != 'DELETED']]></db:parameterized-query>
+                        </db:select>
+                        <set-variable variableName="totaal" value="#[payload[0].totaal]" doc:name="Set totaal (aantal media_ids)"/>
+                        <set-variable variableName="aantal_klaar" value="#[payload[0].aantal_klaar]" doc:name="Set aantal_klaar"/>
+                        <choice doc:name="Everything reconciled from that briefing?">
+                            <when expression="#[flowVars.aantal_klaar != flowVars.totaal]">
+                                <logger message="Briefing niet klaar" level="INFO" doc:name="Briefing niet klaar"/>
+                            </when>
+                            <otherwise>
+                                <dw:transform-message doc:name="Build ready message">
+                                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+        "text": "Briefing " ++ flowVars.briefing_id ++ " is klaar."
+}]]></dw:set-payload>
+                                </dw:transform-message>
+                                <http:request config-ref="HTTP_Request_Configuration" path="${slack.hook}" method="POST" doc:name="Send notification to Slack"/>
+                            </otherwise>
+                        </choice>
                         </when>
                         <otherwise>
                             <logger message="Still PROCESSING when not in archived stage and not failed" level="INFO" doc:name="Still PROCESSING when not in archived stage and not failed"/>

@@ -16,3 +16,14 @@ db.password=
 db.database=
 db.buffer=
 db.messageevents=
+db.skryv_refresh_token=
+
+skryv.host=
+skryv.client_id=
+skryv.client_secret=
+
+elasticsearch.host=
+
+proxy.host=
+
+slack.hook=
