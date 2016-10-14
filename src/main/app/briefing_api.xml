@@ -19,8 +19,11 @@ http://www.mulesoft.org/schema/mule/quartz http://www.mulesoft.org/schema/mule/q
         <reconnect></reconnect>  
     </db:generic-config>
     <quartz:connector name="Quartz1" validateConnections="true" doc:name="Quartz"/>
-    <http:request-config name="HTTP_Skryv_OAUTH" host="${skryv.oauth_host}" port="443" responseTimeout="30000" doc:name="HTTP Request Configuration" protocol="HTTPS"/>
-    <http:request-config name="Skryv_API" protocol="HTTPS" host="${skryv.api_host}" port="443" doc:name="HTTP Request Configuration" responseTimeout="30000"/>
+    <http:request-config name="HTTP_Skryv_OAUTH" host="${skryv.oauth_host}" port="443" responseTimeout="5000" doc:name="HTTP Request Configuration" protocol="HTTPS" connectionIdleTimeout="5000">
+    </http:request-config>
+    <http:request-config name="Skryv_API" protocol="HTTPS" host="${skryv.api_host}" port="443" doc:name="HTTP Request Configuration" responseTimeout="5000" connectionIdleTimeout="5000" basePath="/">
+        <http:proxy host="${proxy.host}" port="80"/>
+    </http:request-config>
     <flow name="vrt_avo_transferFlow">
         <http:listener config-ref="HTTP_Listener_Configuration" path="/briefings/*" allowedMethods="GET, POST, DELETE" doc:name="/briefings/*"/>
         <choice doc:name="Check which HTTP method is used">
@@ -162,7 +165,7 @@ where briefing_id = #[flowVars.briefing_id] and status != 'DELETED']]></db:param
                 <json:object-to-json-transformer doc:name="Object to JSON"/>
             </otherwise>
         </choice>
-        <catch-exception-strategy doc:name="Copy_of_Catch Exception Strategy">
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
             <logger message="500: BRIEFING NOT ADDED #[flowVars.briefing_id]" level="INFO" doc:name="500: BRIEFING NOT ADDED"/>
             <dw:transform-message doc:name="Transform Message">
                 <dw:set-payload><![CDATA[%dw 1.0
@@ -186,37 +189,46 @@ from ${db.skryv_token}
 where id = 1]]></db:parameterized-query>
         </db:select>
         <set-variable variableName="access_token" value="#[payload[0].access_token]" doc:name="Set access_token"/>
+        <logger message="Requesting Skryv document with access token" level="INFO" doc:name="Requesting Skryv document"/>
         <http:request config-ref="Skryv_API" path="/api/documents/#[flowVars.briefing_id]" method="GET" doc:name="Get briefing_ID from Skryv API" parseResponse="false">
             <http:request-builder>
                 <http:header headerName="Authorization" value="Bearer #[flowVars.access_token]"/>
                 <http:header headerName="Accept" value="application/json"/>
             </http:request-builder>
         </http:request>
-        <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
+        <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
+        <set-variable variableName="resp" value="#[payload]" doc:name="Set resp"/>
+        <set-variable variableName="briefing_titel" value="#[flowVars.resp.document['value'].briefing_titel]" doc:name="Set briefing_titel"/>
+        <set-variable variableName="datum" value="#[flowVars.resp.document['value'].finale_selectie_gemaakt_1.datum_6]" doc:name="Set datum"/>
+        <set-variable variableName="uitvoerder" value="#[flowVars.resp.document['value'].finale_selectie_gemaakt_1.uitvoerder_4]" doc:name="Set uitvoerder"/>
+        <set-variable variableName="videos" value="#[payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_video.toString()]" doc:name="Set videos"/>
+        <set-variable variableName="audios" value="#[payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_audio.toString()]" doc:name="Set audios"/>
+        <logger message="Success: #[payload]" level="INFO" doc:name="Success"/>
         <dw:transform-message doc:name="Fetch media_ids, email and briefing_titel">
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
 ---
 {
 	"briefing_id": flowVars.briefing_id,
-	"briefing_titel": payload.document['value'].briefing_titel,
-	"datum": payload.document['value'].finale_selectie_gemaakt_1.datum_6,
-	"uitvoerder": payload.document['value'].finale_selectie_gemaakt_1.uitvoerder_4,
-	"media_ids": (payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_video splitBy "\n" filter trim $ != "" map (
+	briefing_titel: flowVars.briefing_titel,
+	datum: flowVars.datum,
+	uitvoerder: flowVars.uitvoerder,
+	media_ids_video: ((flowVars.videos splitBy "\n") map (
 		{
 			"media_id": trim $,
 			"media_type": "video"
 		}
-		))
-		++ (payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_audio splitBy "\n" filter trim $ != "" map (
+	)),
+	media_ids_audio: ((flowVars.audios splitBy "\n") map (
 		{
 			"media_id": trim $,
 			"media_type": "audio"
 		}
-		))
+	))
 }]]></dw:set-payload>
         </dw:transform-message>
         <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
         <catch-exception-strategy doc:name="Catch Exception Strategy">
             <logger message="500: BRIEFING NOT FOUND #[flowVars.briefing_id]" level="INFO" doc:name="500: BRIEFING NOT FOUND"/>
             <dw:transform-message doc:name="Transform Message">
@@ -247,10 +259,14 @@ where id = 1]]></db:parameterized-query>
         </http:request>
         <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
         <set-variable variableName="access_token" value="#[payload['refresh_token']]" doc:name="Set access_token"/>
+        <logger message="Received access token: #[flowVars.access_token]" level="INFO" doc:name="Received access token"/>
         <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Save access_token">
             <db:parameterized-query><![CDATA[UPDATE ${db.skryv_token}
 SET access_token = #[flowVars.access_token]
 where id = 1]]></db:parameterized-query>
         </db:update>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="Failed to retrieve access token" level="ERROR" doc:name="Failed to retrieve access token"/>
+        </catch-exception-strategy>
     </flow>
 </mule>
