@@ -95,9 +95,21 @@ VALUES(
 from ${db.avo_transfer}
 where status != 'DELETED']]></db:parameterized-query>
                         </db:select>
-                        <dw:transform-message doc:name="Transform Message">
-                            <dw:input-payload doc:sample="sample_data/list_map.dwl"/>
-                            <dw:set-payload><![CDATA[%dw 1.0
+                        <choice doc:name="Briefings found?">
+                            <when expression="#[payload.size() == 0]">
+                                <dw:transform-message doc:name="Briefings is empty">
+                                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"briefings": []
+}]]></dw:set-payload>
+                                </dw:transform-message>
+                            </when>
+                            <otherwise>
+                                <dw:transform-message doc:name="Transform Message">
+                                    <dw:input-payload doc:sample="sample_data/list_map.dwl"/>
+                                    <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
 %var groupedBriefings = (payload as :array) groupBy $.briefing_id
 %var distinctBriefingIds = (payload.briefing_id as :array) distinctBy $
@@ -111,10 +123,13 @@ where status != 'DELETED']]></db:parameterized-query>
 			reception_date: groupedBriefings[$][0].reception_date,
 			uitvoerder: groupedBriefings[$][0].uitvoerder,
 			toegevoegd_door: groupedBriefings[$][0].toegevoegd_door,
-			aantal_bezig: (sizeOf groupedBriefings[$]) - (sizeOf (getGroupedStatussen($)['RECONCILED'] as :array)),
+			aantal_bezig: (sizeOf groupedBriefings[$]) when getGroupedStatussen($)['RECONCILED'] == null 
+				otherwise (sizeOf groupedBriefings[$]) - (sizeOf (getGroupedStatussen($)['RECONCILED'] as :array)),
 			totaal: sizeOf groupedBriefings[$],
-			klaar: false when ((sizeOf groupedBriefings[$]) - (sizeOf groupedBriefings[$]) - (sizeOf (getGroupedStatussen($)['RECONCILED'] as :array))) > 0
-				otherwise true,
+			klaar: (false when (getGroupedStatussen($)['RECONCILED'] == null) 
+				otherwise (
+					false when ((sizeOf groupedBriefings[$]) - (sizeOf groupedBriefings[$]) - (sizeOf (getGroupedStatussen($)['RECONCILED'] as :array))) > 0
+					otherwise true)),
 			media_ids: groupedBriefings[$] map (
 				{
 					media_id: $.media_id,
@@ -125,7 +140,9 @@ where status != 'DELETED']]></db:parameterized-query>
 		}
 	)
 }]]></dw:set-payload>
-                        </dw:transform-message>
+                                </dw:transform-message>
+                            </otherwise>
+                        </choice>
                         <byte-array-to-string-transformer doc:name="Byte Array to String"/>
                 	</when>
                     <otherwise>
