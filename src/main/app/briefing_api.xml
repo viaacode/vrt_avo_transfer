@@ -46,7 +46,7 @@ where briefing_id = #[flowVars.briefing_id]]]></db:parameterized-query>
                     <choice doc:name="Is media type video?">
                         <when expression="#[payload.media_type.equals(&quot;video&quot;)]">
                             <logger message="Add openOT and closedOT as well" level="INFO" doc:name="Yes - Add openOT and closedOT as well"/>
-                            <expression-component doc:name="Add new entry to bulkInsert with status QUEUED"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload.media_id, payload.media_type, 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel])];
+                            <expression-component doc:name="Add new entry + OT's to bulkInsert with status QUEUED"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload.media_id, payload.media_type, 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel])];
 #[flowVars.bulkInsert.add([flowVars.briefing_id, payload.media_id, "openOT", 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel])];
 #[flowVars.bulkInsert.add([flowVars.briefing_id, payload.media_id, "closedOT", 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel])];]]></expression-component>
                         </when>
