@@ -43,7 +43,18 @@ SET status = 'DELETED'
 where briefing_id = #[flowVars.briefing_id]]]></db:parameterized-query>
                 </db:update>
                 <foreach collection="#[flowVars.media_ids]" doc:name="For Each media id">
-                    <expression-component doc:name="Add new entry to bulkInsert with status QUEUED"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload.media_id, payload.media_type, 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel])]]]></expression-component>
+                    <choice doc:name="Is media type video?">
+                        <when expression="#[payload.media_type.equals(&quot;video&quot;)]">
+                            <logger message="Add openOT and closedOT as well" level="INFO" doc:name="Yes - Add openOT and closedOT as well"/>
+                            <expression-component doc:name="Add new entry to bulkInsert with status QUEUED"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload.media_id, payload.media_type, 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel])];
+#[flowVars.bulkInsert.add([flowVars.briefing_id, payload.media_id, "openOT", 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel])];
+#[flowVars.bulkInsert.add([flowVars.briefing_id, payload.media_id, "closedOT", 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel])];]]></expression-component>
+                        </when>
+                        <otherwise>
+                            <logger message="No - Don't add openOT and closedOT" level="INFO" doc:name="No - Don't add openOT and closedOT"/>
+                            <expression-component doc:name="Add new entry to bulkInsert with status QUEUED"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload.media_id, payload.media_type, 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel])];]]></expression-component>
+                        </otherwise>
+                    </choice>
                     <set-variable variableName="media_type" value="#[payload.media_type]" doc:name="Set media_type"/>
                     <set-variable variableName="media_id" value="#[payload.media_id]" doc:name="Set media_id"/>
                     <set-variable variableName="status" value="#['QUEUED']" doc:name="Set status (QUEUED)"/>
