@@ -20,11 +20,11 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
     </http:request-config>
     <ftp:connector name="FTP" pollingFrequency="1000" validateConnections="true" doc:name="FTP"/>
     <flow name="pollerFlow">
-        <amqp:inbound-endpoint queueName="vrt_avo_poller" numberOfChannels="1" responseTimeout="10000" exchange-pattern="request-response"  doc:name="Receive token from vrt_avo_poller" connector-ref="amqp"/>
+        <amqp:inbound-endpoint queueName="vrt_avo_poller" numberOfChannels="1" responseTimeout="10000"   doc:name="Receive token from vrt_avo_poller" connector-ref="amqp"/>
         <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Check for items that are QUEUED, PROCESSING or REQUESTED">
             <db:parameterized-query><![CDATA[select *
 from ${db.avo_transfer}
-where status = 'QUEUED' OR status = 'REQUESTED']]></db:parameterized-query>
+where status = 'QUEUED' OR status = 'REQUESTED' OR status = 'PROCESSING']]></db:parameterized-query>
         </db:select>
         <foreach doc:name="For Each">
             <flow-ref name="SetInfo" doc:name="SetInfo"/>
@@ -80,9 +80,9 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                                     <logger level="INFO" doc:name="If yes, reset the buffer status to ready_for_processing and avo status to PROCESSING back"/>
                                     <expression-component doc:name="Update retry_count - 1"><![CDATA[#[flowVars.retry_count--]]]></expression-component>
                                     <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status of record in vrt_message_buffer to READY_FOR_PROCESSING">
-                                        <db:parameterized-query><![CDATA[UPDATE ${db.buffer}
+                                    <db:parameterized-query><![CDATA[UPDATE ${db.buffer}
 SET status = 'ready_for_processing'
-WHERE id = #[flowVars.correlation_id_buffer]]]></db:parameterized-query>
+WHERE correlation_id = #[flowVars.correlation_id_buffer]]]></db:parameterized-query>
                                     </db:update>
                                     <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status vrt_avo_transfer to PROCESSING">
                                         <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
@@ -166,7 +166,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                                     <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status of record in vrt_message_buffer to READY_FOR_PROCESSING">
                                     <db:parameterized-query><![CDATA[UPDATE ${db.buffer}
 SET status = 'ready_for_processing'
-WHERE id = #[flowVars.correlation_id_buffer]]]></db:parameterized-query>
+WHERE correlation_id = #[flowVars.correlation_id_buffer]]]></db:parameterized-query>
                                     </db:update>
                                 </otherwise>
                             </choice>
