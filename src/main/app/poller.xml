@@ -18,7 +18,9 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
     <http:request-config name="HTTP_Request_Configuration" protocol="HTTPS" host="hooks.slack.com" port="443" basePath="/services" doc:name="HTTP Request Configuration">
         <http:proxy host="${proxy.host}" port="80"/>
     </http:request-config>
-    <ftp:connector name="FTP" pollingFrequency="1000" validateConnections="true" doc:name="FTP"/>
+    <ftp:connector name="FTP" pollingFrequency="1000" validateConnections="true" doc:name="FTP">
+        <reconnect/>
+    </ftp:connector>
     <flow name="pollerFlow">
         <amqp:inbound-endpoint queueName="vrt_avo_poller" numberOfChannels="1" responseTimeout="10000"   doc:name="Receive token from vrt_avo_poller" connector-ref="amqp"/>
         <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Check for items that are QUEUED, PROCESSING or REQUESTED">
@@ -109,8 +111,9 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                             <set-variable variableName="status" value="#['PERMANENTLY_FAILED']" doc:name="Set status (PERMANENTLY_FAILED)"/>
                         </when>
                         <when expression="#[flowVars.buffer_status.equals('completed')||flowVars.buffer_status.equals('awaitingMetadataUpdate24hr')||flowVars.buffer_status.equals('awaitingMetadataUpdate48hr')||flowVars.buffer_status.equals('awaitingMetadataUpdate7d')]">
-                        <logger level="INFO" doc:name="ARCHIVED when status is awaitingMetadataUpdateX or completed"/>
-                            <dw:transform-message doc:name="Build minimal metadata in XML with briefing ID and title (TODO: check if correct format)">
+                        <logger level="INFO" doc:name="ARCHIVED when status is awaitingMetadataUpdateX or completed" message="#[flowVars.briefing_id]: #[flowVars.pid] is archived"/>
+                        <expression-component doc:name="Sleep few seconds so MH doesn't get overwhelmed"><![CDATA[Thread.sleep(3000);]]></expression-component>
+                            <dw:transform-message doc:name="Build minimal metadata in XML with briefing ID and title">
                                 <dw:set-payload><![CDATA[%dw 1.0
 %output application/xml
 ---
@@ -127,6 +130,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                             </dw:transform-message>
                             <object-to-string-transformer doc:name="Object to String"/>
                             <ftp:outbound-endpoint host="${ftpDestination.host}" port="21" path="/" user="${ftpDestination.metadataUsername}" password="${ftpDestination.metadataPassword}" responseTimeout="10000" doc:name="FTP as pid.xml" connector-ref="FTP" outputPattern="#[flowVars.pid + &quot;.xml&quot;]"/>
+                        <logger message="Succeeded with reconciliation: #[flowVars.pid]" level="INFO" doc:name="Success"/>
                             <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status vrt_avo_transfer to RECONCILED and add pid">
                             <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'RECONCILED', pid = #[flowVars.pid]
