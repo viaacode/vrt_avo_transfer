@@ -28,7 +28,7 @@ http://www.mulesoft.org/schema/mule/quartz http://www.mulesoft.org/schema/mule/q
         <http:listener config-ref="HTTP_Listener_Configuration" path="/briefings/*" allowedMethods="GET, POST, DELETE" doc:name="/briefings/*"/>
         <choice doc:name="Check which HTTP method is used">
             <when expression="#[message.inboundProperties.'http.method' == 'POST']">
-                <logger level="INFO" doc:name="POST"/>
+                <logger level="INFO" doc:name="POST" message="POST"/>
                 <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
                 <set-variable variableName="briefing_id" value="#[message.inboundProperties.'http.request.uri'.substring(message.inboundProperties.'http.request.uri'.lastIndexOf('/')+1)]" doc:name="Set briefing_id (prefer to take from URI)"/>
                 <set-variable variableName="briefing_titel" value="#[payload['briefing_titel']]" doc:name="Set briefing_titel"/>
@@ -97,7 +97,7 @@ VALUES(
             </when>
             <otherwise>
                 <logger message="GET" level="INFO" doc:name="GET"/>
-                <logger level="INFO" doc:name="TODO: filter out the briefings that are completed"/>
+                <expression-component doc:name="TODO: filter out the briefings that are completed"><![CDATA[// Do nothing]]></expression-component>
                 <set-variable variableName="briefing_id" value="#[message.inboundProperties.'http.request.uri'.substring(message.inboundProperties.'http.request.uri'.lastIndexOf('/')+1)]" doc:name="Set briefing_id"/>
                 <choice doc:name="Briefing ID given?">
                 	<when expression="#[flowVars.briefing_id.equals('briefings')||flowVars.briefing_id.equals('')]">
@@ -207,6 +207,10 @@ where briefing_id = #[flowVars.briefing_id] and status != 'DELETED']]></db:param
             <set-property propertyName="http.status" value="#[message.inboundProperties['http.status']]" doc:name="Set http status 500"/>
         </catch-exception-strategy>
     </flow>
+    <flow name="briefing_apiFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/briefings/subtitle" allowedMethods="POST" doc:name="HTTP"/>
+        <json:json-to-object-transformer doc:name="JSON to Object"/>
+    </flow>
     <flow name="validateBriefingIDAndReturnMediaIds" initialState="started">
         <http:listener config-ref="HTTP_Listener_Configuration" path="/briefings/validate" allowedMethods="POST" doc:name="/briefings/validate"/>
         <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
@@ -231,7 +235,7 @@ where id = 1]]></db:parameterized-query>
         <set-variable variableName="uitvoerder" value="#[flowVars.resp.document['value'].finale_selectie_gemaakt_1.uitvoerder_4]" doc:name="Set uitvoerder"/>
         <set-variable variableName="videos" value="#[payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_video != null ? payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_video.toString() : &quot;&quot;]" doc:name="Set videos"/>
         <set-variable variableName="audios" value="#[payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_audio != null ? payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_audio.toString() : &quot;&quot;]" doc:name="Set audios"/>
-        <logger message="Success: #[payload]" level="INFO" doc:name="Success"/>
+        <logger message="Successfully got Skryvv document" level="INFO" doc:name="Success"/>
         <dw:transform-message doc:name="Fetch media_ids, email and briefing_titel">
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
@@ -256,7 +260,6 @@ where id = 1]]></db:parameterized-query>
 }]]></dw:set-payload>
         </dw:transform-message>
         <byte-array-to-string-transformer doc:name="Byte Array to String"/>
-        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
         <catch-exception-strategy doc:name="Catch Exception Strategy">
             <logger message="500: BRIEFING NOT FOUND #[flowVars.briefing_id]" level="INFO" doc:name="500: BRIEFING NOT FOUND"/>
             <dw:transform-message doc:name="Transform Message">

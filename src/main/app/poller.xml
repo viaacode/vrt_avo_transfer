@@ -14,7 +14,7 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
 	<amqp:connector name="amqp" validateConnections="true" host="${rabbit.host}" port="${rabbit.port}"  username="${rabbit.username}" password="${rabbit.password}" ackMode="MANUAL" prefetchCount="1" doc:name="AMQP-0-9 Connector"> 
         <reconnect-forever></reconnect-forever>  
     </amqp:connector>
-    <http:request-config name="HTTP_ES_logging" host="${elasticsearch.host}" port="9200" basePath="/" responseTimeout="30000" doc:name="HTTP Request Configuration" usePersistentConnections="false" protocol="HTTP"/>
+    <http:request-config name="HTTP_ES_logging" host="${elasticsearch.host}" port="9200" basePath="/" responseTimeout="30000" doc:name="HTTP Request Configuration" usePersistentConnections="false" />
     <http:request-config name="HTTP_Request_Configuration" protocol="HTTPS" host="hooks.slack.com" port="443" basePath="/services" doc:name="HTTP Request Configuration">
         <http:proxy host="${proxy.host}" port="80"/>
     </http:request-config>
@@ -75,7 +75,7 @@ ORDER BY lastmodificationdate desc]]></db:parameterized-query>
                             <logger message="item failed to retrieve" level="INFO" doc:name="failed"/>
                             <choice doc:name="Are there retries left over, or is the status STOPPED?">
                                 <when expression="#[flowVars.retry_count&lt;=0 || flowVars.buffer_status == 'stopped' || flowVars.buffer_status == 'permanently_failed']">
-                                    <logger level="INFO" doc:name="FINAL: No retries left, set status to FAILED"/>
+                                    <logger message="FINAL: No retries left, set status to FAILED" level="INFO" doc:name="FINAL: No retries left, set status to FAILED"/>
                                     <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status to FAILED">
                                     <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'FAILED'
@@ -85,7 +85,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                                 <flow-ref name="isBriefingReady" doc:name="isBriefingReady"/>
                                 </when>
                                 <otherwise>
-                                    <logger level="INFO" doc:name="If yes, reset the buffer status to ready_for_processing and avo status to PROCESSING back"/>
+                                    <logger message="reset the buffer status to ready_for_processing and avo status to PROCESSING back" level="INFO" doc:name="If yes, reset the buffer status to ready_for_processing and avo status to PROCESSING back"/>
                                     <expression-component doc:name="Update retry_count - 1"><![CDATA[#[flowVars.retry_count = flowVars.retry_count - 1]]]></expression-component>
                                     <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status of record in vrt_message_buffer to READY_FOR_PROCESSING">
                                     <db:parameterized-query><![CDATA[UPDATE ${db.buffer}
@@ -102,7 +102,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                             </choice>
                         </when>
                         <when expression="#[flowVars.buffer_status.equals('permanently_failed')]">
-                            <logger level="INFO" doc:name="permanently_failed"/>
+                            <logger message="permanently_failed" level="INFO" doc:name="permanently_failed"/>
                             <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status vrt_avo_transfer to PERMANENTLY_FAILED">
                                 <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'PERMANENTLY_FAILED'
@@ -148,7 +148,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                         </db:update>
                             <choice doc:name="If item is queued or stuck in processing, give it push forward">
                                 <when expression="#[!flowVars.buffer_status.equals('queued')&amp;&amp;!flowVars.buffer_status.equals('processing')]">
-                                    <logger level="INFO" doc:name="Do nothing"/>
+                                <expression-component doc:name="Do nothing"><![CDATA[//Do nothing]]></expression-component>
                                 </when>
                                 <otherwise>
                                     <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status of record in vrt_message_buffer to READY_FOR_PROCESSING">
@@ -164,7 +164,7 @@ WHERE correlation_id = #[flowVars.correlation_id_buffer]]]></db:parameterized-qu
                 <otherwise>
                     <choice doc:name="Item already manual requested?">
                         <when expression="#[flowVars.transfer_status.equals('REQUESTED')]">
-                            <logger level="INFO" doc:name="Item already requested, so do nothing"/>
+                        <expression-component doc:name="Item already requested, so do nothing"><![CDATA[//Do nothing]]></expression-component>
                         </when>
                         <otherwise>
                         <dw:transform-message doc:name="Build manual request">
@@ -193,7 +193,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
     <sub-flow name="log_elastic_search">
         <choice doc:name="When status is not null">
             <when expression="#[flowVars.status==null]">
-                <logger level="INFO" doc:name="Nothing changed, so don't log"/>
+                <expression-component doc:name="Nothing changed, so don't log"><![CDATA[// Do nothing]]></expression-component>
             </when>
             <otherwise>
                 <set-variable variableName="timestamp" value="#[server.dateTime.format(&quot;yyyy-MM-dd'T'HH:mm:ss.SSSZ&quot;)]" doc:name="Set timestamp"/>
