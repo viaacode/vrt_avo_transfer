@@ -104,11 +104,12 @@ VALUES(
                 <choice doc:name="Briefing ID given?">
                 	<when expression="#[flowVars.briefing_id.equals('briefings')||flowVars.briefing_id.equals('')]">
                 		<db:select config-ref="PostgreSQL_CONNECTION" doc:name="Get all briefings that are not DELETED">
-                            <db:parameterized-query><![CDATA[select *
-from vrt_avo_transfer
-where status != 'DELETED' and (media_type = 'video' or media_type = 'audio')
-AND briefing_id IN(SELECT DISTINCT(briefing_id) FROM vrt_avo_transfer LIMIT #[flowVars.nrOfResults] OFFSET #[flowVars.startIndex])
-ORDER BY reception_date DESC;]]></db:parameterized-query>
+                            <db:parameterized-query><![CDATA[select vrt_avo_transfer.*
+from vrt_avo_transfer vrt_avo_transfer
+LEFT JOIN (SELECT briefing_id, MAX(reception_date) as reception_date FROM vrt_avo_transfer GROUP BY briefing_id ORDER BY reception_date DESC LIMIT #[flowVars.nrOfResults] OFFSET #[flowVars.startIndex]) temp
+ON vrt_avo_transfer.briefing_id = temp.briefing_id
+where vrt_avo_transfer.status != 'DELETED' and (vrt_avo_transfer.media_type = 'video' or vrt_avo_transfer.media_type = 'audio')
+ORDER BY vrt_avo_transfer.reception_date DESC;]]></db:parameterized-query>
                         </db:select>
                         <choice doc:name="Briefings found?">
                             <when expression="#[payload.size() == 0]">
