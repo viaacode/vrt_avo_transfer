@@ -28,7 +28,7 @@ http://www.mulesoft.org/schema/mule/quartz http://www.mulesoft.org/schema/mule/q
         <http:listener config-ref="HTTP_Listener_Configuration" path="/briefings/*" allowedMethods="GET, POST, DELETE" doc:name="/briefings/*"/>
         <choice doc:name="Check which HTTP method is used">
             <when expression="#[message.inboundProperties.'http.method' == 'POST']">
-                <logger level="INFO" doc:name="POST" message="POST"/>
+                <logger message="POST" level="INFO" doc:name="POST"/>
                 <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
                 <set-variable variableName="briefing_id" value="#[message.inboundProperties.'http.request.uri'.substring(message.inboundProperties.'http.request.uri'.lastIndexOf('/')+1)]" doc:name="Set briefing_id (prefer to take from URI)"/>
                 <set-variable variableName="briefing_titel" value="#[payload['briefing_titel']]" doc:name="Set briefing_titel"/>
@@ -98,13 +98,18 @@ VALUES(
             <otherwise>
                 <logger message="GET" level="INFO" doc:name="GET"/>
                 <expression-component doc:name="TODO: filter out the briefings that are completed"><![CDATA[// Do nothing]]></expression-component>
+                <flow-ref name="parseStartIndex" doc:name="parseStartIndex"/>
+                <flow-ref name="parseNrOfResults" doc:name="parseNrOfResults"/>
                 <set-variable variableName="briefing_id" value="#[message.inboundProperties.'http.request.uri'.substring(message.inboundProperties.'http.request.uri'.lastIndexOf('/')+1)]" doc:name="Set briefing_id"/>
                 <choice doc:name="Briefing ID given?">
-                	<when expression="#[flowVars.briefing_id.equals('briefings')||flowVars.briefing_id.equals('')]">
-                		<db:select config-ref="PostgreSQL_CONNECTION" doc:name="Get all briefings that are not DELETED">
-                            <db:parameterized-query><![CDATA[select *
-from ${db.avo_transfer}
-where status != 'DELETED' and (media_type = 'video' or media_type = 'audio')]]></db:parameterized-query>
+                    <when expression="#[flowVars.briefing_id.equals('briefings')||flowVars.briefing_id.equals('')]">
+                        <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Get all briefings that are not DELETED">
+                            <db:parameterized-query><![CDATA[select vrt_avo_transfer.*
+from vrt_avo_transfer vrt_avo_transfer
+INNER JOIN (SELECT briefing_id, MAX(reception_date) as reception_date FROM vrt_avo_transfer GROUP BY briefing_id ORDER BY reception_date DESC LIMIT #[flowVars.nrOfResults] OFFSET #[flowVars.startIndex]) temp
+ON vrt_avo_transfer.briefing_id = temp.briefing_id
+where vrt_avo_transfer.status != 'DELETED' and (vrt_avo_transfer.media_type = 'video' or vrt_avo_transfer.media_type = 'audio')
+ORDER BY vrt_avo_transfer.reception_date DESC;]]></db:parameterized-query>
                         </db:select>
                         <choice doc:name="Briefings found?">
                             <when expression="#[payload.size() == 0]">
@@ -155,7 +160,7 @@ where status != 'DELETED' and (media_type = 'video' or media_type = 'audio')]]><
                             </otherwise>
                         </choice>
                         <byte-array-to-string-transformer doc:name="Byte Array to String"/>
-                	</when>
+                    </when>
                     <otherwise>
                         <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Get briefing">
                             <db:parameterized-query><![CDATA[select *
@@ -298,6 +303,35 @@ where id = 1]]></db:parameterized-query>
         </db:update>
         <catch-exception-strategy doc:name="Catch Exception Strategy">
             <logger message="Failed to retrieve access token" level="ERROR" doc:name="Failed to retrieve access token"/>
+        </catch-exception-strategy>
+    </flow>
+    
+        <flow name="parseStartIndex" processingStrategy="synchronous">
+        <set-variable variableName="startIndex" value="#[java.lang.Integer.parseInt(message.inboundProperties.'http.query.params'.startIndex)]" doc:name="Set startIndex"/>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.startIndex &lt; 0]">
+            	<set-variable variableName="startIndex" value="#[0]" doc:name="Set startIndex"/>
+            </when>
+            <otherwise>
+                <logger message="startIndex: #[flowVars.startIndex]" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <set-variable variableName="startIndex" value="#[0]" doc:name="Set startIndex"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="parseNrOfResults" processingStrategy="synchronous">
+        <set-variable variableName="nrOfResults" value="#[java.lang.Integer.parseInt(message.inboundProperties.'http.query.params'.nrOfResults)]" doc:name="Set nrOfResults"/>
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.nrOfResults &lt;= 0]">
+                <set-variable variableName="nrOfResults" value="#[10]" doc:name="Set nrOfResults"/>
+            </when>
+            <otherwise>
+                <logger message="nrOfResults: #[flowVars.nrOfResults]" level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <set-variable variableName="nrOfResults" value="#[10]" doc:name="Set nrOfResults"/>
         </catch-exception-strategy>
     </flow>
 </mule>
