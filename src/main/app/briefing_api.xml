@@ -323,7 +323,7 @@ where id = 1]]></db:parameterized-query>
         <set-variable variableName="nrOfResults" value="#[java.lang.Integer.parseInt(message.inboundProperties.'http.query.params'.nrOfResults)]" doc:name="Set nrOfResults"/>
         <choice doc:name="Choice">
             <when expression="#[flowVars.nrOfResults &lt;= 0]">
-                <set-variable variableName="nrOfResults" value="#[25]" doc:name="Set nrOfResults"/>
+                <set-variable variableName="nrOfResults" value="#[10]" doc:name="Set nrOfResults"/>
             </when>
             <otherwise>
                 <logger message="nrOfResults: #[flowVars.nrOfResults]" level="INFO" doc:name="Logger"/>
