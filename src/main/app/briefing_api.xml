@@ -330,7 +330,7 @@ where id = 1]]></db:parameterized-query>
             </otherwise>
         </choice>
         <catch-exception-strategy doc:name="Catch Exception Strategy">
-            <set-variable variableName="nrOfResults" value="#[25]" doc:name="Set nrOfResults"/>
+            <set-variable variableName="nrOfResults" value="#[10]" doc:name="Set nrOfResults"/>
         </catch-exception-strategy>
     </flow>
 </mule>
