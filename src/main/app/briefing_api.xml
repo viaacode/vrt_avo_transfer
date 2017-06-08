@@ -286,7 +286,7 @@ where id = 1]]></db:parameterized-query>
             </http:request-builder>
         </http:request>
         <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
-        <set-variable variableName="access_token" value="#[payload['refresh_token']]" doc:name="Set access_token"/>
+        <set-variable variableName="access_token" value="#[payload['access_token']]" doc:name="Set access_token"/>
         <logger message="Received access token: #[flowVars.access_token]" level="INFO" doc:name="Received access token"/>
         <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Save access_token">
             <db:parameterized-query><![CDATA[UPDATE ${db.skryv_token}
