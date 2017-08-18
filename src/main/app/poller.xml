@@ -21,7 +21,7 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
     <ftp:connector name="FTP" pollingFrequency="1000" validateConnections="true" doc:name="FTP">
         <reconnect/>
     </ftp:connector>
-    <flow name="pollerFlow">
+    <flow name="pollerFlow" initialState="started" processingStrategy="synchronous">
         <amqp:inbound-endpoint queueName="vrt_avo_poller" numberOfChannels="1" responseTimeout="10000"   doc:name="Receive token from vrt_avo_poller" connector-ref="amqp"/>
         <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Check for items that are QUEUED, PROCESSING or REQUESTED">
             <db:parameterized-query><![CDATA[select *
