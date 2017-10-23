@@ -36,7 +36,7 @@ http://www.mulesoft.org/schema/mule/quartz http://www.mulesoft.org/schema/mule/q
                 <set-variable variableName="toegevoegd_door" value="#[payload['toegevoegd_door']]" doc:name="Set toegevoegd_door"/>
                 <set-variable variableName="reception_date" value="#[Calendar.getInstance().time]" doc:name="Set reception_date"/>
                 <set-variable variableName="bulkInsert" value="#[[]]" doc:name="Set bulkInsert"/>
-                <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Set status of previous briefing version DELETED">
+                <db:update config-ref="Borndigital" doc:name="Set status of previous briefing version DELETED">
                     <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'DELETED'
 where briefing_id = #[flowVars.briefing_id]]]></db:parameterized-query>
@@ -62,7 +62,7 @@ where briefing_id = #[flowVars.briefing_id]]]></db:parameterized-query>
                     </async>
                 </foreach>
                 <set-payload value="#[flowVars.bulkInsert]" doc:name="Set Payload with bulkInsert"/>
-                <db:insert config-ref="PostgreSQL_CONNECTION" bulkMode="true" doc:name="Bulk insert new briefing into vrt_avo_transfer">
+                <db:insert config-ref="Borndigital" bulkMode="true" doc:name="Bulk insert new briefing into vrt_avo_transfer">
                     <db:parameterized-query><![CDATA[INSERT INTO ${db.avo_transfer} (
 	briefing_id,
 	media_id,
@@ -172,7 +172,7 @@ ORDER BY vrt_avo_transfer.reception_date DESC;]]></db:parameterized-query>
                         </choice>
                     </when>
                     <otherwise>
-                        <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Get briefing">
+                        <db:select config-ref="Borndigital" doc:name="Get briefing">
                             <db:parameterized-query><![CDATA[select *
 from ${db.avo_transfer}
 where briefing_id = #[flowVars.briefing_id] and status != 'DELETED']]></db:parameterized-query>
@@ -255,7 +255,7 @@ where briefing_id = #[flowVars.briefing_id] and status != 'DELETED']]></db:param
         <http:listener config-ref="HTTP_Listener_Configuration" path="/briefings/validate" allowedMethods="POST" doc:name="/briefings/validate"/>
         <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
         <set-variable variableName="briefing_id" value="#[payload['briefing_id']]" doc:name="Set briefing_id to validate"/>
-        <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Retrieve access_token">
+        <db:select config-ref="Borndigital" doc:name="Retrieve access_token">
             <db:parameterized-query><![CDATA[select *
 from ${db.skryv_token}
 where id = 1]]></db:parameterized-query>
@@ -331,7 +331,7 @@ where id = 1]]></db:parameterized-query>
         <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
         <set-variable variableName="access_token" value="#[payload['refresh_token']]" doc:name="Set access_token"/>
         <logger message="Received access token: #[flowVars.access_token]" level="INFO" doc:name="Received access token"/>
-        <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Save access_token">
+        <db:update config-ref="Borndigital" doc:name="Save access_token">
             <db:parameterized-query><![CDATA[UPDATE ${db.skryv_token}
 SET access_token = #[flowVars.access_token]
 where id = 1]]></db:parameterized-query>

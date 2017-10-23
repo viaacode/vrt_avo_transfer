@@ -21,16 +21,16 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
     <ftp:connector name="FTP" pollingFrequency="1000" validateConnections="true" doc:name="FTP">
         <reconnect/>
     </ftp:connector>
-    <flow name="pollerFlow">
+    <flow name="pollerFlow" initialState="started" processingStrategy="synchronous">
         <amqp:inbound-endpoint queueName="vrt_avo_poller" numberOfChannels="1" responseTimeout="10000"   doc:name="Receive token from vrt_avo_poller" connector-ref="amqp"/>
-        <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Check for items that are QUEUED, PROCESSING or REQUESTED">
+        <db:select config-ref="Borndigital" doc:name="Check for items that are QUEUED, PROCESSING or REQUESTED">
             <db:parameterized-query><![CDATA[select *
 from ${db.avo_transfer}
 where (status = 'QUEUED' OR status = 'REQUESTED' OR status = 'PROCESSING') AND (media_type = 'video' or media_type = 'audio')]]></db:parameterized-query>
         </db:select>
         <foreach doc:name="For Each">
             <flow-ref name="SetInfo" doc:name="SetInfo"/>
-            <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Retrieve info from vrt_message_buffer">
+            <db:select config-ref="Borndigital" doc:name="Retrieve info from vrt_message_buffer">
                 <db:parameterized-query><![CDATA[select *
 from ${db.buffer}
 where media_id = #[flowVars.media_id] 
@@ -76,7 +76,7 @@ ORDER BY lastmodificationdate desc]]></db:parameterized-query>
                             <choice doc:name="Are there retries left over, or is the status STOPPED?">
                                 <when expression="#[flowVars.retry_count&lt;=0 || flowVars.buffer_status == 'stopped' || flowVars.buffer_status == 'permanently_failed']">
                                     <logger message="FINAL: No retries left, set status to FAILED" level="INFO" doc:name="FINAL: No retries left, set status to FAILED"/>
-                                    <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status to FAILED">
+                                    <db:update config-ref="Borndigital" doc:name="Update status to FAILED">
                                     <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'FAILED'
 where id = #[flowVars.id]]]></db:parameterized-query>
@@ -87,12 +87,12 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                                 <otherwise>
                                     <logger message="reset the buffer status to ready_for_processing and avo status to PROCESSING back" level="INFO" doc:name="If yes, reset the buffer status to ready_for_processing and avo status to PROCESSING back"/>
                                     <expression-component doc:name="Update retry_count - 1"><![CDATA[#[flowVars.retry_count = flowVars.retry_count - 1]]]></expression-component>
-                                    <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status of record in vrt_message_buffer to READY_FOR_PROCESSING">
+                                    <db:update config-ref="Borndigital" doc:name="Update status of record in vrt_message_buffer to READY_FOR_PROCESSING">
                                     <db:parameterized-query><![CDATA[UPDATE ${db.buffer}
 SET status = 'ready_for_processing'
 WHERE correlation_id = #[flowVars.correlation_id_buffer]]]></db:parameterized-query>
                                     </db:update>
-                                    <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status vrt_avo_transfer to PROCESSING">
+                                    <db:update config-ref="Borndigital" doc:name="Update status vrt_avo_transfer to PROCESSING">
                                         <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'PROCESSING'
 where id = #[flowVars.id]]]></db:parameterized-query>
@@ -103,7 +103,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                         </when>
                         <when expression="#[flowVars.buffer_status.equals('permanently_failed')]">
                             <logger message="permanently_failed" level="INFO" doc:name="permanently_failed"/>
-                            <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status vrt_avo_transfer to PERMANENTLY_FAILED">
+                            <db:update config-ref="Borndigital" doc:name="Update status vrt_avo_transfer to PERMANENTLY_FAILED">
                                 <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'PERMANENTLY_FAILED'
 where id = #[flowVars.id]]]></db:parameterized-query>
@@ -131,7 +131,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                             <object-to-string-transformer doc:name="Object to String"/>
                             <ftp:outbound-endpoint host="${ftpDestination.host}" port="21" path="/" user="${ftpDestination.metadataUsername}" password="${ftpDestination.metadataPassword}" responseTimeout="10000" doc:name="FTP as pid.xml" connector-ref="FTP" outputPattern="#[flowVars.pid + &quot;.xml&quot;]"/>
                         <logger message="Succeeded with reconciliation: #[flowVars.pid]" level="INFO" doc:name="Success"/>
-                            <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status vrt_avo_transfer to RECONCILED and add pid">
+                            <db:update config-ref="Borndigital" doc:name="Update status vrt_avo_transfer to RECONCILED and add pid">
                             <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'RECONCILED', pid = #[flowVars.pid]
 where id = #[flowVars.id]]]></db:parameterized-query>
@@ -141,7 +141,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                         </when>
                         <otherwise>
                             <logger message="Still PROCESSING when not in archived stage and not failed" level="INFO" doc:name="Still PROCESSING when not in archived stage and not failed"/>
-                        <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status to PROCESSING in case this wasn't already">
+                        <db:update config-ref="Borndigital" doc:name="Update status to PROCESSING in case this wasn't already">
                             <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'PROCESSING'
 where id = #[flowVars.id]]]></db:parameterized-query>
@@ -151,7 +151,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                                 <expression-component doc:name="Do nothing"><![CDATA[//Do nothing]]></expression-component>
                                 </when>
                                 <otherwise>
-                                    <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status of record in vrt_message_buffer to READY_FOR_PROCESSING">
+                                    <db:update config-ref="Borndigital" doc:name="Update status of record in vrt_message_buffer to READY_FOR_PROCESSING">
                                     <db:parameterized-query><![CDATA[UPDATE ${db.buffer}
 SET status = 'ready_for_processing'
 WHERE correlation_id = #[flowVars.correlation_id_buffer]]]></db:parameterized-query>
@@ -179,7 +179,7 @@ WHERE correlation_id = #[flowVars.correlation_id_buffer]]]></db:parameterized-qu
                         </dw:transform-message>
                         <byte-array-to-string-transformer doc:name="Byte Array to String"/>
                         <amqp:outbound-endpoint queueName="vrt_manual_requests" responseTimeout="10000" exchange-pattern="request-response" connector-ref="amqp" doc:name="vrt_manual_requests component"/>
-                            <db:update config-ref="PostgreSQL_CONNECTION" doc:name="Update status vrt_avo_transfer to REQUESTED">
+                            <db:update config-ref="Borndigital" doc:name="Update status vrt_avo_transfer to REQUESTED">
                                 <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'REQUESTED'
 where id = #[flowVars.id]]]></db:parameterized-query>
@@ -222,7 +222,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
         </choice>
     </sub-flow>
     <sub-flow name="isBriefingReady">
-        <db:select config-ref="PostgreSQL_CONNECTION" doc:name="Check if briefing is READY">
+        <db:select config-ref="Borndigital" doc:name="Check if briefing is READY">
             <db:parameterized-query><![CDATA[select count(1) totaal, SUM(CASE WHEN status = 'RECONCILED' THEN 1 ELSE 0 END) aantal_klaar
 FROM ${db.avo_transfer}
 where briefing_id = #[flowVars.briefing_id] AND status != 'DELETED' and status != 'FAILED']]></db:parameterized-query>
