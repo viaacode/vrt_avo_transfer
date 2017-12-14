@@ -26,12 +26,43 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
         <db:select config-ref="Borndigital" doc:name="Check for items that are QUEUED, PROCESSING or REQUESTED">
             <db:parameterized-query><![CDATA[select *
 from ${db.avo_transfer}
-where (status = 'QUEUED' OR status = 'REQUESTED' OR status = 'PROCESSING') AND (media_type = 'video' or media_type = 'audio')]]></db:parameterized-query>
+where (status = 'QUEUED' OR status = 'REQUESTED' OR status = 'PROCESSING') AND (media_type IN ('video', 'audio', 'unknown'))]]></db:parameterized-query>
         </db:select>
         <foreach doc:name="For Each">
             <flow-ref name="SetInfo" doc:name="SetInfo"/>
-            <db:select config-ref="Borndigital" doc:name="Retrieve info from vrt_message_buffer">
-                <db:parameterized-query><![CDATA[select *
+            <choice doc:name="When media_id is empty, its an item from VIAA MAM">
+                <when expression="#[flowVars.media_id == null || flowVars.media_id == &quot;&quot;]">
+                    <logger message="#[flowVars.briefing_id]: #[flowVars.pid] is archived" level="INFO" doc:name="When PID in MAM is added to briefing, it's supposed to be archived"/>
+                    <expression-component doc:name="Sleep few seconds so MH doesn't get overwhelmed"><![CDATA[Thread.sleep(3000);]]></expression-component>
+                    <dw:transform-message doc:name="Build minimal metadata in XML with briefing ID">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+---
+{
+	MediaHAVEN_external_metadata: {
+		MDProperties: {
+			// dit is doorzoekbaar
+			Algemeen_Briefing_ID @(type:"list"): {
+				BriefingID: flowVars.briefing_id			
+			}
+		}
+	}
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                    <object-to-string-transformer doc:name="Object to String"/>
+                    <ftp:outbound-endpoint host="${ftpDestination.host}" port="21" path="/" user="${ftpDestination.metadataUsername}" password="${ftpDestination.metadataPassword}" connector-ref="FTP" outputPattern="#[flowVars.pid + &quot;.xml&quot;]" responseTimeout="10000" doc:name="FTP as pid.xml"/>
+                    <logger message="Succeeded with reconciliation: #[flowVars.pid]" level="INFO" doc:name="Success"/>
+                    <db:update config-ref="Borndigital" doc:name="Update status vrt_avo_transfer to RECONCILED and add pid">
+                        <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
+SET status = 'RECONCILED'
+where id = #[flowVars.id]]]></db:parameterized-query>
+                    </db:update>
+                    <set-variable variableName="status" value="#['RECONCILED']" doc:name="Set status (RECONCILED)"/>
+                    <flow-ref name="isBriefingReady" doc:name="isBriefingReady"/>
+                </when>
+                <otherwise>
+                    <db:select config-ref="Borndigital" doc:name="Retrieve info from vrt_message_buffer">
+                        <db:parameterized-query><![CDATA[select *
 from ${db.buffer}
 where media_id = #[flowVars.media_id] 
 	and event_name IN (select event_name
@@ -40,8 +71,10 @@ where media_id = #[flowVars.media_id]
 					)
 	and pid is not null
 ORDER BY lastmodificationdate desc]]></db:parameterized-query>
-            </db:select>
-            <flow-ref name="check" doc:name="check"/>
+                    </db:select>
+                    <flow-ref name="check" doc:name="check"/>
+                </otherwise>
+            </choice>
             <flow-ref name="log_elastic_search" doc:name="log_elastic_search"/>
             
         </foreach>
@@ -57,6 +90,7 @@ ORDER BY lastmodificationdate desc]]></db:parameterized-query>
     <sub-flow name="SetInfo">
         <set-variable variableName="id" value="#[payload.id]" doc:name="Set id"/>
         <set-variable variableName="media_id" value="#[payload['media_id']]" doc:name="Set media_id"/>
+        <set-variable variableName="pid" value="#[payload['pid']]" doc:name="Set pid"/>
         <set-variable variableName="briefing_id" value="#[payload['briefing_id']]" doc:name="Set briefing_id"/>
         <set-variable variableName="transfer_status" value="#[payload['status']]" doc:name="transfer_status"/>
         <set-variable variableName="email" value="#[payload['email']]" doc:name="email"/>
