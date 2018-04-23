@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:quartz="http://www.mulesoft.org/schema/mule/quartz" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:context="http://www.springframework.org/schema/context" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:quartz="http://www.mulesoft.org/schema/mule/quartz" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:context="http://www.springframework.org/schema/context" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
 	xmlns:spring="http://www.springframework.org/schema/beans" 
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
@@ -143,7 +143,7 @@ ORDER BY vrt_avo_transfer.reception_date DESC;]]></db:parameterized-query>
 				otherwise (
 					false when ((sizeOf groupedBriefings[$]) - (sizeOf groupedBriefings[$]) - (sizeOf (getGroupedStatussen($)['RECONCILED'] as :array))) > 0
 					otherwise true)),
-			media_ids: groupedBriefings[$] map (
+			items: groupedBriefings[$] map (
 				{
 					media_id: $.media_id,
 					media_type: $.media_type,
@@ -321,14 +321,14 @@ where id = 1]]></db:parameterized-query>
         <set-variable variableName="nrOfResults" value="#[java.lang.Integer.parseInt(message.inboundProperties.'http.query.params'.nrOfResults)]" doc:name="Set nrOfResults"/>
         <choice doc:name="Choice">
             <when expression="#[flowVars.nrOfResults &lt;= 0]">
-                <set-variable variableName="nrOfResults" value="#[10]" doc:name="Set nrOfResults"/>
+                <set-variable variableName="nrOfResults" value="#[70]" doc:name="Set nrOfResults"/>
             </when>
             <otherwise>
                 <logger message="nrOfResults: #[flowVars.nrOfResults]" level="INFO" doc:name="Logger"/>
             </otherwise>
         </choice>
         <catch-exception-strategy doc:name="Catch Exception Strategy">
-            <set-variable variableName="nrOfResults" value="#[10]" doc:name="Set nrOfResults"/>
+            <set-variable variableName="nrOfResults" value="#[70]" doc:name="Set nrOfResults"/>
         </catch-exception-strategy>
     </flow>
 </mule>
