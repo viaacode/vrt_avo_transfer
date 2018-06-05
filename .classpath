@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="src" path="src/main/app"/>
+	<classpathentry excluding="**/*.java" kind="src" path="src/main/api"/>
+	<classpathentry excluding="**/*.java" kind="src" path="src/main/app"/>
 	<classpathentry kind="src" path="src/main/java"/>
-	<classpathentry kind="src" path="src/main/resources"/>
+	<classpathentry excluding="**/*.java" kind="src" path="src/main/resources"/>
 	<classpathentry kind="src" output="target/test-classes" path="src/test/java"/>
-	<classpathentry kind="src" output="target/test-classes" path="src/test/resources"/>
-	<classpathentry kind="src" path="src/main/api"/>
-	<classpathentry kind="src" path="src/main/wsdl"/>
-	<classpathentry kind="src" path="src/test/munit"/>
-	<classpathentry kind="lib" path="src/main/resources/postgresql-9.4-1201.jdbc4.jar"/>
-	<classpathentry kind="con" path="MULE_LIB/AMQP-0-9/mule-transport-amqp-contribution"/>
-	<classpathentry kind="con" path="MULE_LIB/AMQPS-0-9/mule-transport-amqp-contribution"/>
-	<classpathentry exported="true" kind="con" path="MULE_RUNTIME/org.mule.tooling.server.3.7.4.ee"/>
+	<classpathentry excluding="**/*.java" kind="src" output="target/test-classes" path="src/test/resources"/>
+	<classpathentry kind="con" path="MULE_RUNTIME"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="var" path="M2_REPO/com/rabbitmq/amqp-client/3.6.1/amqp-client-3.6.1.jar"/>
+	<classpathentry kind="var" path="M2_REPO/org/mockito/mockito-core/1.10.19/mockito-core-1.10.19.jar"/>
+	<classpathentry kind="var" path="M2_REPO/org/mule/transports/mule-transport-amqp/3.7.8/mule-transport-amqp-3.7.8.jar"/>
+	<classpathentry kind="var" path="M2_REPO/org/objenesis/objenesis/2.1/objenesis-2.1.jar"/>
+	<classpathentry kind="var" path="M2_REPO/org/postgresql/postgresql/9.4.1212.jre6/postgresql-9.4.1212.jre6.jar"/>
+	<classpathentry kind="src" path="/viaa-domain"/>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>
