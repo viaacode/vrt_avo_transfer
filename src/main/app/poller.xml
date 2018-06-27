@@ -26,7 +26,7 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
         <db:select config-ref="Borndigital" doc:name="Check for items that are QUEUED, PROCESSING or REQUESTED">
             <db:parameterized-query><![CDATA[select *
 from ${db.avo_transfer}
-where (status = 'QUEUED' OR status = 'REQUESTED' OR status = 'PROCESSING') AND (media_type IN ('video', 'audio', 'unknown'))]]></db:parameterized-query>
+where status IN('QUEUED', 'REQUESTED', 'PROCESSING', 'FAILED') AND (media_type IN ('video', 'audio', 'unknown'))]]></db:parameterized-query>
         </db:select>
         <foreach doc:name="For Each">
             <flow-ref name="SetInfo" doc:name="SetInfo"/>
