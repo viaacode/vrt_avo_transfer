@@ -1,67 +1,21 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-  
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
+
   <groupId>com.mycompany</groupId>
   <artifactId>vrt_avo_transfer</artifactId>
   <version>1.0.0-SNAPSHOT</version>
   <packaging>mule</packaging>
+
   <name>Mule vrt_avo_transfer Application</name>
-  
+
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <mule.version>3.9.0</mule.version>
     <mule.tools.version>1.2</mule.tools.version>
   </properties>
-  
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.mule.tools.maven</groupId>
-        <artifactId>mule-app-maven-plugin</artifactId>
-        <version>${mule.tools.version}</version>
-        <extensions>true</extensions>
-        <configuration>
-          <copyToAppsDirectory>true</copyToAppsDirectory>
-          <inclusions>
-            <inclusion>
-              <groupId>org.mule.transports</groupId>
-              <artifactId>mule-transport-amqp</artifactId>
-            </inclusion>
-          </inclusions>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>build-helper-maven-plugin</artifactId>
-        <version>1.7</version>
-        <executions>
-          <execution>
-            <id>add-resource</id>
-            <phase>generate-resources</phase>
-            <goals>
-              <goal>add-resource</goal>
-            </goals>
-            <configuration>
-              <resources>
-                <resource>
-                  <directory>src/main/app/</directory>
-                </resource>
-                <resource>
-                  <directory>src/main/api/</directory>
-                </resource>
-                <resource>
-                  <directory>mappings/</directory>
-                </resource>
-              </resources>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-    </plugins>
-  </build>
-  
+
   <!-- Mule Dependencies -->
   <dependencies>
     <!-- Xml configuration -->
@@ -144,11 +98,17 @@
             <groupId>be.viaa</groupId>
             <artifactId>viaa-domain</artifactId>
             <version>1.0.0-SNAPSHOT</version>
-            <scope>test</scope>
             <type>zip</type>
+            <scope>test</scope>
+        </dependency>
+    <dependency>
+            <groupId>org.mule.modules</groupId>
+            <artifactId>mule-module-spring-config</artifactId>
+            <version>${mule.version}</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
-  
+
   <repositories>
     <repository>
       <id>Central</id>
@@ -163,7 +123,6 @@
       <layout>default</layout>
     </repository>
   </repositories>
-  
   <pluginRepositories>
     <pluginRepository>
       <id>mulesoft-release</id>
@@ -176,4 +135,50 @@
     </pluginRepository>
   </pluginRepositories>
 
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.mule.tools.maven</groupId>
+        <artifactId>mule-app-maven-plugin</artifactId>
+        <version>${mule.tools.version}</version>
+        <extensions>true</extensions>
+        <configuration>
+          <copyToAppsDirectory>true</copyToAppsDirectory>
+          <inclusions>
+            <inclusion>
+              <groupId>org.mule.transports</groupId>
+              <artifactId>mule-transport-amqp</artifactId>
+            </inclusion>
+          </inclusions>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>1.7</version>
+        <executions>
+          <execution>
+            <id>add-resource</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>add-resource</goal>
+            </goals>
+            <configuration>
+              <resources>
+                <resource>
+                  <directory>src/main/app/</directory>
+                </resource>
+                <resource>
+                  <directory>src/main/api/</directory>
+                </resource>
+                <resource>
+                  <directory>mappings/</directory>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>
