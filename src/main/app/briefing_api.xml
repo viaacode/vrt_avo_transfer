@@ -14,7 +14,6 @@ http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/
 http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
 http://www.mulesoft.org/schema/mule/quartz http://www.mulesoft.org/schema/mule/quartz/current/mule-quartz.xsd">
     <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="${http.port}" doc:name="HTTP Listener Configuration"/>
-    <context:property-placeholder location="${mule.env}.properties"/>
     <quartz:connector name="Quartz1" validateConnections="true" doc:name="Quartz"/>
     <http:request-config name="HTTP_Skryv_OAUTH" host="${skryv.oauth_host}" port="443" responseTimeout="5000" doc:name="HTTP Request Configuration" protocol="HTTPS" connectionIdleTimeout="5000">
     </http:request-config>
