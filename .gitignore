@@ -49,4 +49,5 @@ local.properties
 .studio/
 flows/
 target/
+catalog/
 **/*.mflow
