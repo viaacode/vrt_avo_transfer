@@ -237,7 +237,7 @@ from ${db.skryv_token}
 where id = 1]]></db:parameterized-query>
         </db:select>
         <set-variable variableName="access_token" value="#[payload[0].access_token]" doc:name="Set access_token"/>
-        <logger message="Requesting Skryv document with access token" level="INFO" doc:name="Requesting Skryv document"/>
+        <logger message="Get briefing with id: #[flowVars.briefing_id]" level="INFO" doc:name="Log: Get briefing with id..."/>
         <http:request config-ref="Skryv_API" path="/api/documents/#[flowVars.briefing_id]" method="GET" doc:name="Get briefing_ID from Skryv API" parseResponse="false">
             <http:request-builder>
                 <http:header headerName="Authorization" value="Bearer #[flowVars.access_token]"/>
@@ -252,7 +252,7 @@ where id = 1]]></db:parameterized-query>
         <set-variable variableName="videos" value="#[payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_video != null ? payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_video.toString() : &quot;&quot;]" doc:name="Set videos (VRT)"/>
         <set-variable variableName="audios" value="#[payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_audio != null ? payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_audio.toString() : &quot;&quot;]" doc:name="Set audios (VRT)"/>
         <set-variable variableName="viaa_pids" value="#[payload.document['value'].finale_selectie_gemaakt_1.lijst_viaa_pids != null ? payload.document['value'].finale_selectie_gemaakt_1.lijst_viaa_pids.toString() : &quot;&quot;]" doc:name="Set viaa_pids (content that already is in MAM)"/>
-        <logger message="Successfully got Skryvv document" level="INFO" doc:name="Success"/>
+        <logger message="Briefing #[flowVars.briefing_id] found. Title is: &quot;#[flowVars.briefing_titel]&quot;" level="INFO" doc:name="Log: Briefing found. Title is: ..."/>
         <dw:transform-message doc:name="Fetch media_ids, email and briefing_titel">
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
