@@ -24,9 +24,10 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
     <flow name="pollerFlow" initialState="started" processingStrategy="synchronous">
         <amqp:inbound-endpoint queueName="vrt_avo_poller" numberOfChannels="1" responseTimeout="10000"   doc:name="Receive token from vrt_avo_poller" connector-ref="amqp"/>
         <db:select config-ref="Borndigital" doc:name="Check for items that are QUEUED, PROCESSING or REQUESTED">
-            <db:parameterized-query><![CDATA[select *
-from ${db.avo_transfer}
-where status IN('QUEUED', 'REQUESTED', 'PROCESSING', 'FAILED') AND (media_type IN ('video', 'audio', 'unknown'))]]></db:parameterized-query>
+            <db:parameterized-query><![CDATA[SELECT *
+FROM ${db.avo_transfer}
+WHERE status IN ('QUEUED', 'REQUESTED', 'PROCESSING', 'FAILED')
+  AND (media_type IN ('video', 'audio', 'unknown'));]]></db:parameterized-query>
         </db:select>
         <foreach doc:name="For Each">
             <flow-ref name="SetInfo" doc:name="SetInfo"/>
@@ -62,15 +63,15 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                 </when>
                 <otherwise>
                     <db:select config-ref="Borndigital" doc:name="Retrieve info from vrt_message_buffer">
-                        <db:parameterized-query><![CDATA[select *
-from ${db.buffer}
-where media_id = #[flowVars.media_id]
-	and event_name IN (select event_name
-						from messageevents
-						where file_type = #[flowVars.media_type]
-					)
-	and pid is not null
-ORDER BY lastmodificationdate desc]]></db:parameterized-query>
+                        <db:parameterized-query><![CDATA[SELECT *
+FROM ${db.buffer}
+WHERE media_id = #[flowVars.media_id]
+  AND event_name IN
+    (SELECT event_name
+     FROM messageevents
+     WHERE file_type = #[flowVars.media_type] )
+  AND pid IS NOT NULL
+ORDER BY lastmodificationdate DESC;]]></db:parameterized-query>
                     </db:select>
                     <flow-ref name="check" doc:name="check"/>
                 </otherwise>
