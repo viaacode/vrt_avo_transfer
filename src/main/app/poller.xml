@@ -51,7 +51,8 @@ WHERE status IN ('QUEUED', 'REQUESTED', 'PROCESSING', 'FAILED')
 }]]></dw:set-payload>
                     </dw:transform-message>
                     <object-to-string-transformer doc:name="Object to String"/>
-                    <ftp:outbound-endpoint host="${ftpDestination.host}" port="21" path="/" user="${ftpDestination.metadataUsername}" password="${ftpDestination.metadataPassword}" connector-ref="FTP" outputPattern="#[flowVars.pid + &quot;.xml&quot;]" responseTimeout="10000" doc:name="FTP as pid.xml"/>
+<!--                     <ftp:outbound-endpoint host="${ftpDestination.host}" port="21" path="/" user="${ftpDestination.metadataUsername}" password="${ftpDestination.metadataPassword}" connector-ref="FTP" outputPattern="#[flowVars.pid + &quot;.xml&quot;]" responseTimeout="10000" doc:name="FTP as pid.xml"/> -->
+                    <logger message="Metadata payload: #[payload]" level="INFO" doc:name="Log: payload (metadata)"/>
                     <logger message="Succeeded with reconciliation: #[flowVars.pid]" level="INFO" doc:name="Success"/>
                     <db:update config-ref="Borndigital" doc:name="Update status vrt_avo_transfer to RECONCILED and add pid">
                         <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
