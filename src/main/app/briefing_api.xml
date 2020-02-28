@@ -106,7 +106,7 @@ VALUES(
                 </dw:transform-message>
             </when>
             <otherwise>
-                <logger message="GET" level="INFO" doc:name="GET"/>
+                <logger message="GET #[message.inboundProperties['http.request.uri']]" level="INFO" doc:name="GET request.uri"/>
                 <expression-component doc:name="TODO: filter out the briefings that are completed"><![CDATA[// Do nothing]]></expression-component>
                 <flow-ref name="parseStartIndex" doc:name="parseStartIndex"/>
                 <flow-ref name="parseNrOfResults" doc:name="parseNrOfResults"/>
@@ -299,7 +299,7 @@ where id = 1]]></db:parameterized-query>
         </catch-exception-strategy>
     </flow>
     <flow name="FetchNewAccessTokenWithRefreshToken" >
-        <quartz:inbound-endpoint jobName="PollerJob" repeatInterval="300000" responseTimeout="10000" doc:name="Quartz" connector-ref="Quartz1" startDelay="0">
+        <quartz:inbound-endpoint jobName="PollerJob" repeatInterval="600000" responseTimeout="10000" doc:name="Quartz" connector-ref="Quartz1" startDelay="0">
             <quartz:event-generator-job/>
         </quartz:inbound-endpoint>
         <logger message="Requesting new access token" level="INFO" doc:name="Requesting new access token"/>
@@ -326,13 +326,13 @@ where id = 1]]></db:parameterized-query>
     </flow>
     
         <flow name="parseStartIndex" processingStrategy="synchronous">
-        <set-variable variableName="startIndex" value="#[java.lang.Integer.parseInt(message.inboundProperties.'http.query.params'.startIndex)]" doc:name="Set startIndex"/>
+        <set-variable variableName="startIndex" value="#[java.lang.Integer.parseInt(message.inboundProperties['http.query.params']['startIndex'])]" doc:name="Set startIndex"/>
         <choice doc:name="Choice">
             <when expression="#[flowVars.startIndex &lt; 0]">
             	<set-variable variableName="startIndex" value="#[0]" doc:name="Set startIndex"/>
             </when>
             <otherwise>
-                <logger message="startIndex: #[flowVars.startIndex]" level="INFO" doc:name="Logger"/>
+                <logger message="startIndex: #[flowVars.startIndex]" level="INFO" doc:name="Log startIndex"/>
             </otherwise>
         </choice>
         <catch-exception-strategy doc:name="Catch Exception Strategy">
@@ -340,13 +340,13 @@ where id = 1]]></db:parameterized-query>
         </catch-exception-strategy>
     </flow>
     <flow name="parseNrOfResults" processingStrategy="synchronous">
-        <set-variable variableName="nrOfResults" value="#[java.lang.Integer.parseInt(message.inboundProperties.'http.query.params'.nrOfResults)]" doc:name="Set nrOfResults"/>
+        <set-variable variableName="nrOfResults" value="#[java.lang.Integer.parseInt(message.inboundProperties['http.query.params']['nrOfResults'])]" doc:name="Set nrOfResults"/>
         <choice doc:name="Choice">
             <when expression="#[flowVars.nrOfResults &lt;= 0]">
                 <set-variable variableName="nrOfResults" value="#[70]" doc:name="Set nrOfResults"/>
             </when>
             <otherwise>
-                <logger message="nrOfResults: #[flowVars.nrOfResults]" level="INFO" doc:name="Logger"/>
+                <logger message="nrOfResults: #[flowVars.nrOfResults]" level="INFO" doc:name="Log nrOfResults"/>
             </otherwise>
         </choice>
         <catch-exception-strategy doc:name="Catch Exception Strategy">

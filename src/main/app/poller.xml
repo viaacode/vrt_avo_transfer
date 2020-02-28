@@ -18,9 +18,9 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
     <http:request-config name="HTTP_Request_Configuration" protocol="HTTPS" host="hooks.slack.com" port="443" basePath="/services" doc:name="HTTP Request Configuration">
         <http:proxy host="${proxy.host}" port="80"/>
     </http:request-config>
-    <ftp:connector name="FTP" pollingFrequency="1000" validateConnections="true" doc:name="FTP">
+    <!--<ftp:connector name="FTP" pollingFrequency="1000" validateConnections="true" doc:name="FTP">
         <reconnect/>
-    </ftp:connector>
+</ftp:connector>-->
     <flow name="pollerFlow" initialState="started" processingStrategy="synchronous">
         <amqp:inbound-endpoint queueName="vrt_avo_poller" numberOfChannels="1" responseTimeout="10000"   doc:name="Receive token from vrt_avo_poller" connector-ref="amqp"/>
         <db:select config-ref="Borndigital" doc:name="Check for items that are QUEUED, PROCESSING or REQUESTED">
@@ -80,11 +80,11 @@ ORDER BY lastmodificationdate DESC;]]></db:parameterized-query>
             <flow-ref name="log_elastic_search" doc:name="log_elastic_search"/>
             
         </foreach>
-        <expression-component doc:name="Sleep"><![CDATA[Thread.sleep(3000);]]></expression-component>
+        <expression-component doc:name="Sleep"><![CDATA[Thread.sleep(10000);]]></expression-component>
         <amqp:outbound-endpoint queueName="vrt_avo_poller" responseTimeout="10000" exchange-pattern="request-response" doc:name="Send to vrt_avo_poller"/>
         <amqp:acknowledge-message doc:name="AMQP-0-9 Acknowledge Message"/>
         <catch-exception-strategy doc:name="Catch Exception Strategy">
-            <expression-component doc:name="Sleep"><![CDATA[Thread.sleep(3000);]]></expression-component>
+            <expression-component doc:name="Sleep"><![CDATA[Thread.sleep(10000);]]></expression-component>
             <amqp:outbound-endpoint queueName="vrt_avo_poller" responseTimeout="10000" exchange-pattern="request-response" doc:name="Send to vrt_avo_poller"/>
             <amqp:acknowledge-message doc:name="AMQP-0-9 Acknowledge Message"/>
         </catch-exception-strategy>
