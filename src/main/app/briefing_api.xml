@@ -26,7 +26,7 @@ http://www.mulesoft.org/schema/mule/quartz http://www.mulesoft.org/schema/mule/q
         <choice doc:name="Check which HTTP method is used">
             <when expression="#[message.inboundProperties.'http.method' == 'POST']">
                 <byte-array-to-string-transformer doc:name="Byte Array to String"/>
-                <logger message="POST #[payload]" level="INFO" doc:name="POST"/>
+                <logger message="[#[message.id]] POST #[payload]" level="INFO" doc:name="POST"/>
                 <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
                 <set-variable variableName="briefing_id" value="#[message.inboundProperties.'http.request.uri'.substring(message.inboundProperties.'http.request.uri'.lastIndexOf('/')+1)]" doc:name="Set briefing_id (prefer to take from URI)"/>
                 <set-variable variableName="briefing_titel" value="#[payload['briefing_titel']]" doc:name="Set briefing_titel"/>
@@ -44,13 +44,13 @@ where briefing_id = #[flowVars.briefing_id]]]></db:parameterized-query>
                 <foreach collection="#[flowVars.media_ids]" doc:name="For Each media id">
                     <choice doc:name="Is media type video?">
                         <when expression="#[payload.media_type.equals(&quot;video&quot;)]">
-                            <logger message="Add openOT and closedOT as well" level="INFO" doc:name="Yes - Add openOT and closedOT as well"/>
+                            <logger message="[#[message.id]] Add openOT and closedOT as well" level="INFO" doc:name="Yes - Add openOT and closedOT as well"/>
                             <expression-component doc:name="Add video with status QUEUED"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload.media_id, payload.media_type, 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel, null])]]]></expression-component>
                             <expression-component doc:name="Add openOt"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload.media_id, 'openOt', 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel, null])]]]></expression-component>
                             <expression-component doc:name="Add closedOt"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload.media_id, 'closedOt', 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel, null])]]]></expression-component>
                         </when>
                         <otherwise>
-                            <logger message="No - Don't add openOT and closedOT" level="INFO" doc:name="No - Don't add openOT and closedOT"/>
+                            <logger message="[#[message.id]] No - Don't add openOT and closedOT" level="INFO" doc:name="No - Don't add openOT and closedOT"/>
                             <expression-component doc:name="Add new entry to bulkInsert with status QUEUED"><![CDATA[#[flowVars.bulkInsert.add([flowVars.briefing_id, payload.media_id, payload.media_type, 'QUEUED', flowVars.uitvoerder, flowVars.toegevoegd_door, flowVars.reception_date, flowVars.briefing_titel, null])]]]></expression-component>
                         </otherwise>
                     </choice>
@@ -95,7 +95,7 @@ VALUES(
 	#[payload[8]]
 	)]]></db:parameterized-query>
                 </db:insert>
-                <logger message="Briefing_id #[flowVars.briefing_id] has been added with media_ids: #[flowVars.media_ids] and pids: #[flowVars.viaa_pids] (contact person: #[flowVars.email])" level="INFO" doc:name="Add media_id with briefing_id"/>
+                <logger message="[#[message.id]] Briefing_id #[flowVars.briefing_id] has been added with media_ids: #[flowVars.media_ids] and pids: #[flowVars.viaa_pids] (contact person: #[flowVars.email])" level="INFO" doc:name="Add media_id with briefing_id"/>
                 <dw:transform-message doc:name="Build response JSON">
                     <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
@@ -106,7 +106,7 @@ VALUES(
                 </dw:transform-message>
             </when>
             <otherwise>
-                <logger message="GET #[message.inboundProperties['http.request.uri']]" level="INFO" doc:name="GET request.uri"/>
+                <logger message="[#[message.id]] GET #[message.inboundProperties['http.request.uri']]" level="INFO" doc:name="GET request.uri"/>
                 <expression-component doc:name="TODO: filter out the briefings that are completed"><![CDATA[// Do nothing]]></expression-component>
                 <flow-ref name="parseStartIndex" doc:name="parseStartIndex"/>
                 <flow-ref name="parseNrOfResults" doc:name="parseNrOfResults"/>
@@ -210,7 +210,7 @@ where briefing_id = #[flowVars.briefing_id] and status != 'DELETED']]></db:param
             </otherwise>
         </choice>
         <catch-exception-strategy doc:name="Catch Exception Strategy">
-            <logger message="500: BRIEFING NOT ADDED #[flowVars.briefing_id]" level="INFO" doc:name="500: BRIEFING NOT ADDED"/>
+            <logger message="[#[message.id]] 500: BRIEFING NOT ADDED #[flowVars.briefing_id]" level="INFO" doc:name="500: BRIEFING NOT ADDED"/>
             <dw:transform-message doc:name="Transform Message">
                 <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
@@ -237,7 +237,7 @@ from ${db.skryv_token}
 where id = 1]]></db:parameterized-query>
         </db:select>
         <set-variable variableName="access_token" value="#[payload[0].access_token]" doc:name="Set access_token"/>
-        <logger message="Requesting Skryv document with access token" level="INFO" doc:name="Requesting Skryv document"/>
+        <logger message="[#[message.id]] Requesting Skryv document: #[flowVars.briefing_id]" level="INFO" doc:name="Requesting Skryv document"/>
         <http:request config-ref="Skryv_API" path="/api/documents/#[flowVars.briefing_id]" method="GET" doc:name="Get briefing_ID from Skryv API" parseResponse="false">
             <http:request-builder>
                 <http:header headerName="Authorization" value="Bearer #[flowVars.access_token]"/>
@@ -252,7 +252,7 @@ where id = 1]]></db:parameterized-query>
         <set-variable variableName="videos" value="#[payload.document['value'].finale_selectie_gemaakt_1.?lijst_mediaids_video != null ? ( payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_video.?text != null ? ( payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_video.text.toString() ) : payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_video.toString() ) : &quot;&quot;]" doc:name="Set videos (VRT)"/>
         <set-variable variableName="audios" value="#[payload.document['value'].finale_selectie_gemaakt_1.?lijst_mediaids_audio != null ? ( payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_audio.?text != null ? ( payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_audio.text.toString() ) : payload.document['value'].finale_selectie_gemaakt_1.lijst_mediaids_audio.toString() ) : &quot;&quot;]" doc:name="Set audios (VRT)"/>
         <set-variable variableName="viaa_pids" value="#[payload.document['value'].finale_selectie_gemaakt_1.?lijst_viaa_pids != null ? ( payload.document['value'].finale_selectie_gemaakt_1.lijst_viaa_pids.?text != null ? ( payload.document['value'].finale_selectie_gemaakt_1.lijst_viaa_pids.text.toString() ) : payload.document['value'].finale_selectie_gemaakt_1.lijst_viaa_pids.toString() ) : &quot;&quot;]" doc:name="Set viaa_pids (content that already is in MAM)"/>
-        <logger message="Successfully got Skryvv document with ID: #[flowVars.briefing_id]" level="INFO" doc:name="Success"/>
+        <logger message="[#[message.id]] Successfully got Skryvv document with ID: #[flowVars.briefing_id]" level="INFO" doc:name="Success"/>
         <dw:transform-message doc:name="Fetch media_ids, email and briefing_titel">
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
@@ -285,7 +285,8 @@ where id = 1]]></db:parameterized-query>
         </dw:transform-message>
         <byte-array-to-string-transformer doc:name="Byte Array to String"/>
         <catch-exception-strategy doc:name="Catch Exception Strategy">
-            <logger message="500: BRIEFING NOT FOUND #[flowVars.briefing_id]" level="INFO" doc:name="500: BRIEFING NOT FOUND"/>
+            <logger message="[#[message.id]] 500: BRIEFING NOT FOUND #[flowVars.briefing_id]" level="WARN" doc:name="500: BRIEFING NOT FOUND"/>
+            <logger message="[#[message.id]] Exception message: #[exception.?message or exception.cause]" level="WARN" doc:name="Log Exception"/>
             <dw:transform-message doc:name="Transform Message">
                 <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
@@ -302,7 +303,7 @@ where id = 1]]></db:parameterized-query>
         <quartz:inbound-endpoint jobName="PollerJob" repeatInterval="600000" responseTimeout="10000" doc:name="Quartz" connector-ref="Quartz1" startDelay="0">
             <quartz:event-generator-job/>
         </quartz:inbound-endpoint>
-        <logger message="Requesting new access token" level="INFO" doc:name="Requesting new access token"/>
+        <logger message="[#[message.id]] Requesting new access token from ${skryv.oauth_host}" level="INFO" doc:name="Requesting new access token"/>
         <http:request config-ref="HTTP_Skryv_OAUTH" path="/oauth/token" method="POST" doc:name="Send POST to Skryv">
             <http:request-builder>
                 <http:query-param paramName="client_id" value="${skryv.client_id}"/>
@@ -314,14 +315,14 @@ where id = 1]]></db:parameterized-query>
         </http:request>
         <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
         <set-variable variableName="access_token" value="#[payload['access_token']]" doc:name="Set access_token"/>
-        <logger message="Received access token: #[flowVars.access_token]" level="INFO" doc:name="Received access token"/>
+        <logger message="[#[message.id]] Received access token: #[flowVars.access_token]" level="INFO" doc:name="Received access token"/>
         <db:update config-ref="Borndigital" doc:name="Save access_token">
             <db:parameterized-query><![CDATA[UPDATE ${db.skryv_token}
 SET access_token = #[flowVars.access_token]
 where id = 1]]></db:parameterized-query>
         </db:update>
         <catch-exception-strategy doc:name="Catch Exception Strategy">
-            <logger message="Failed to retrieve access token" level="ERROR" doc:name="Failed to retrieve access token"/>
+            <logger message="[#[message.id]] Failed to retrieve access token" level="ERROR" doc:name="Failed to retrieve access token"/>
         </catch-exception-strategy>
     </flow>
     
@@ -332,7 +333,7 @@ where id = 1]]></db:parameterized-query>
             	<set-variable variableName="startIndex" value="#[0]" doc:name="Set startIndex"/>
             </when>
             <otherwise>
-                <logger message="startIndex: #[flowVars.startIndex]" level="INFO" doc:name="Log startIndex"/>
+                <logger message="[#[message.id]] startIndex: #[flowVars.startIndex]" level="INFO" doc:name="Log startIndex"/>
             </otherwise>
         </choice>
         <catch-exception-strategy doc:name="Catch Exception Strategy">
@@ -346,7 +347,7 @@ where id = 1]]></db:parameterized-query>
                 <set-variable variableName="nrOfResults" value="#[70]" doc:name="Set nrOfResults"/>
             </when>
             <otherwise>
-                <logger message="nrOfResults: #[flowVars.nrOfResults]" level="INFO" doc:name="Log nrOfResults"/>
+                <logger message="[#[message.id]] nrOfResults: #[flowVars.nrOfResults]" level="INFO" doc:name="Log nrOfResults"/>
             </otherwise>
         </choice>
         <catch-exception-strategy doc:name="Catch Exception Strategy">

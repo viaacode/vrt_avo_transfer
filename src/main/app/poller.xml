@@ -33,7 +33,7 @@ WHERE status IN ('QUEUED', 'REQUESTED', 'PROCESSING', 'FAILED')
             <flow-ref name="SetInfo" doc:name="SetInfo"/>
             <choice doc:name="When media_id is empty, its an item from VIAA MAM">
                 <when expression="#[flowVars.media_id == null || flowVars.media_id == &quot;&quot;]">
-                    <logger message="ARCHIVED: #[flowVars.briefing_id]: #[flowVars.pid]" level="INFO" doc:name="ARCHIVED: briefing_id: pid"/>
+                    <logger message="[#[message.id]] ARCHIVED: #[flowVars.briefing_id]: #[flowVars.pid]" level="INFO" doc:name="ARCHIVED: briefing_id: pid"/>
                     <expression-component doc:name="Sleep few seconds so MH doesn't get overwhelmed"><![CDATA[Thread.sleep(3000);]]></expression-component>
                     <dw:transform-message doc:name="Build minimal metadata in XML with briefing ID">
                         <dw:set-payload><![CDATA[%dw 1.0
@@ -52,8 +52,8 @@ WHERE status IN ('QUEUED', 'REQUESTED', 'PROCESSING', 'FAILED')
                     </dw:transform-message>
                     <object-to-string-transformer doc:name="Object to String"/>
 <!--                     <ftp:outbound-endpoint host="${ftpDestination.host}" port="21" path="/" user="${ftpDestination.metadataUsername}" password="${ftpDestination.metadataPassword}" connector-ref="FTP" outputPattern="#[flowVars.pid + &quot;.xml&quot;]" responseTimeout="10000" doc:name="FTP as pid.xml"/> -->
-                    <logger message="Metadata payload: #[payload]" level="INFO" doc:name="Log: payload (metadata)"/>
-                    <logger message="Succeeded with reconciliation: #[flowVars.pid]" level="INFO" doc:name="Success"/>
+                    <logger message="[#[message.id]] Metadata payload: #[payload]" level="INFO" doc:name="Log: payload (metadata)"/>
+                    <logger message="[#[message.id]] Succeeded with reconciliation: #[flowVars.pid]" level="INFO" doc:name="Success"/>
                     <db:update config-ref="Borndigital" doc:name="Update status vrt_avo_transfer to RECONCILED and add pid">
                         <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'RECONCILED'
@@ -109,10 +109,10 @@ ORDER BY lastmodificationdate DESC;]]></db:parameterized-query>
                     <set-variable variableName="correlation_id_buffer" value="#[payload[0].correlation_id]" doc:name="Set correlation_id_buffer"/>
                     <choice doc:name="What's the buffer status of the item?">
                         <when expression="#[flowVars.buffer_status.equals('failed') || flowVars.buffer_status.equals('stopped') || flowVars.buffer_status.equals('permanently_failed')]">
-                            <logger message="Item failed to retrieve: media_id = #[flowVars.media_id]" level="INFO" doc:name="Item failed to retrieve"/>
+                            <logger message="[#[message.id]] Item failed to retrieve: media_id = #[flowVars.media_id]" level="INFO" doc:name="Item failed to retrieve"/>
                             <choice doc:name="Are there retries left over, or is the status STOPPED?">
                                 <when expression="#[flowVars.retry_count&lt;=0 || flowVars.buffer_status == 'stopped' || flowVars.buffer_status == 'permanently_failed']">
-                                    <logger message="FINAL: No retries left, set status to FAILED for media_id: #[flowVars.media_id]" level="INFO" doc:name="FINAL: No retries left, set status to FAILED"/>
+                                    <logger message="[#[message.id]] FINAL: No retries left, set status to FAILED for media_id: #[flowVars.media_id]" level="INFO" doc:name="FINAL: No retries left, set status to FAILED"/>
                                     <db:update config-ref="Borndigital" doc:name="Update status to FAILED">
                                     <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'FAILED'
@@ -122,7 +122,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                                 <flow-ref name="isBriefingReady" doc:name="isBriefingReady"/>
                                 </when>
                                 <otherwise>
-                                    <logger message="reset the buffer status to ready_for_processing and avo status to PROCESSING back for media_id: #[flowVars.media_id]" level="INFO" doc:name="If yes, reset the buffer status to ready_for_processing and avo status to PROCESSING back"/>
+                                    <logger message="[#[message.id]] reset the buffer status to ready_for_processing and avo status to PROCESSING back for media_id: #[flowVars.media_id]" level="INFO" doc:name="If yes, reset the buffer status to ready_for_processing and avo status to PROCESSING back"/>
                                     <expression-component doc:name="Update retry_count - 1"><![CDATA[#[flowVars.retry_count = flowVars.retry_count - 1]]]></expression-component>
                                     <db:update config-ref="Borndigital" doc:name="Update status of record in vrt_message_buffer to READY_FOR_PROCESSING">
                                     <db:parameterized-query><![CDATA[UPDATE ${db.buffer}
@@ -139,7 +139,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                             </choice>
                         </when>
                         <when expression="#[flowVars.buffer_status.equals('permanently_failed')]">
-                            <logger message="permanently_failed: media_id = #[flowVars.media_id]" level="INFO" doc:name="permanently_failed"/>
+                            <logger message="[#[message.id]] permanently_failed: media_id = #[flowVars.media_id]" level="INFO" doc:name="permanently_failed"/>
                             <db:update config-ref="Borndigital" doc:name="Update status vrt_avo_transfer to PERMANENTLY_FAILED">
                                 <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'PERMANENTLY_FAILED'
@@ -148,7 +148,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                             <set-variable variableName="status" value="#['PERMANENTLY_FAILED']" doc:name="Set status (PERMANENTLY_FAILED)"/>
                         </when>
                         <when expression="#[flowVars.buffer_status.equals('completed') || flowVars.buffer_status.equals('awaitingMetadata')]">
-                        <logger level="INFO" doc:name="ARCHIVED when status is completed" message="#[flowVars.briefing_id]: #[flowVars.pid] is archived (media_id = #[flowVars.media_id])"/>
+                        <logger level="INFO" doc:name="ARCHIVED when status is completed" message="[#[message.id]] #[flowVars.briefing_id]: #[flowVars.pid] is archived (media_id = #[flowVars.media_id])"/>
                         <expression-component doc:name="Sleep few seconds so MH doesn't get overwhelmed"><![CDATA[Thread.sleep(3000);]]></expression-component>
                             <dw:transform-message doc:name="Build minimal metadata in XML with briefing ID">
                                 <dw:set-payload><![CDATA[%dw 1.0
@@ -167,8 +167,8 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                             </dw:transform-message>
                             <object-to-string-transformer doc:name="Object to String"/>
 <!--                            <ftp:outbound-endpoint host="${ftpDestination.host}" port="21" path="/" user="${ftpDestination.metadataUsername}" password="${ftpDestination.metadataPassword}" responseTimeout="10000" doc:name="FTP as pid.xml" connector-ref="FTP" outputPattern="#[flowVars.pid + &quot;.xml&quot;]"/> -->
-                        <logger message="Metadata payload: #[payload]" level="INFO" doc:name="Log: payload (metadata)"/>
-                        <logger message="Succeeded with reconciliation: #[flowVars.pid] (media_id = #[flowVars.media_id])" level="INFO" doc:name="Succeeded with reconciliation"/>
+                        <logger message="[#[message.id]] Metadata payload: #[payload]" level="INFO" doc:name="Log: payload (metadata)"/>
+                        <logger message="[#[message.id]] Succeeded with reconciliation: #[flowVars.pid] (media_id = #[flowVars.media_id])" level="INFO" doc:name="Succeeded with reconciliation"/>
                             <db:update config-ref="Borndigital" doc:name="Update status vrt_avo_transfer to RECONCILED and add pid">
                             <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'RECONCILED', pid = #[flowVars.pid]
@@ -178,7 +178,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
                         <flow-ref name="isBriefingReady" doc:name="isBriefingReady"/>
                         </when>
                         <otherwise>
-                            <logger message="Still PROCESSING when not in archived stage and not failed: media_id = #[flowVars.media_id]" level="INFO" doc:name="Still PROCESSING when not in archived stage and not failed"/>
+                            <logger message="[#[message.id]] Still PROCESSING when not in archived stage and not failed: media_id = #[flowVars.media_id]" level="INFO" doc:name="Still PROCESSING when not in archived stage and not failed"/>
                         <db:update config-ref="Borndigital" doc:name="Update status to PROCESSING in case this wasn't already">
                             <db:parameterized-query><![CDATA[UPDATE ${db.avo_transfer}
 SET status = 'PROCESSING'
@@ -202,10 +202,10 @@ WHERE correlation_id = #[flowVars.correlation_id_buffer]]]></db:parameterized-qu
                 <otherwise>
                     <choice doc:name="Item already manual requested?">
                         <when expression="#[flowVars.transfer_status.equals('REQUESTED')]">
-                        <logger message="Item already requested, nothing to do (media_id: #[flowVars.media_id])" level="INFO" doc:name="Log: Item already requested, nothing to do"/>
+                        <logger message="[#[message.id]] Item already requested, nothing to do (media_id: #[flowVars.media_id])" level="INFO" doc:name="Log: Item already requested, nothing to do"/>
                         </when>
                         <otherwise>
-                        <logger message="Requesting item: media_id = #[flowVars.media_id]" level="INFO" doc:name="Log: requesting item"/>
+                        <logger message="[#[message.id]] Requesting item: media_id = #[flowVars.media_id]" level="INFO" doc:name="Log: requesting item"/>
                         <dw:transform-message doc:name="Build manual request">
                             <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
@@ -255,7 +255,7 @@ where id = #[flowVars.id]]]></db:parameterized-query>
 }]]></dw:set-payload>
                 </dw:transform-message>
                 <byte-array-to-string-transformer doc:name="Byte Array to String"/>
-                <logger message="#[payload]" level="DEBUG" doc:name="Debug payload"/>
+                <logger message="[#[message.id]] #[payload]" level="DEBUG" doc:name="Debug payload"/>
                 <http:request config-ref="HTTP_ES_logging" path="vrt_avo_transfer/events" method="POST" doc:name="POST event to ES"/>
             </otherwise>
         </choice>
@@ -270,7 +270,7 @@ where briefing_id = #[flowVars.briefing_id] AND status != 'DELETED' and status !
         <set-variable variableName="aantal_klaar" value="#[payload[0].aantal_klaar]" doc:name="Set aantal_klaar"/>
         <choice doc:name="Everything reconciled in this briefing?">
             <when expression="#[flowVars.aantal_klaar != flowVars.totaal]">
-                <logger message="Briefing not ready: #[flowVars.briefing_id]" level="INFO" doc:name="Log: briefing not ready"/>
+                <logger message="[#[message.id]] Briefing not ready: #[flowVars.briefing_id]" level="INFO" doc:name="Log: briefing not ready"/>
             </when>
             <otherwise>
                 <dw:transform-message doc:name="Build ready message">
